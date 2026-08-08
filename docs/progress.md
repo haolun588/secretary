@@ -1,25 +1,31 @@
-# 專案進度與任務清單 (Progress Checklist)
+# Secretary 專案開發進度清單 (Development Progress)
 
-## Phase 1: 規格與文件建立 (Documentation & Specification)
-- [x] 建立 `docs/progress.md` 專案進度清單 (含左側導覽選單列與分頁架構)
-- [x] 建立 `docs/dev_rules.md` 開發規範與技術設計說明
-- [x] 建立 `docs/architecture.md` 系統架構與檔案結構說明
+## 📌 Phase 1: 基礎架構與桌面 UI 介面 (已完成)
+- [x] PyQt6 專案目錄結構與主程式建立 (`main.py`, `ui/`)
+- [x] 暗黑高顏值主題與電光紫配色 (`#121217`, `#1c1c24`, `#8b5cf6`)
+- [x] 左側導覽列 `NavSidebar` (日曆與行程 / 喝水與設定)
+- [x] 中間月曆 `CalendarView` (440px 寬、1:1 置中、週末電光紫字體)
+- [x] 右側提醒面板 `SidebarFrame` (340px 緊貼右側、雙行頂部導覽列)
+- [x] 選取日期當日行程卡片 `TodayEventCard` (標題/地點/備註獨立三行、100% 依字數自適應高度、`word-break: break-all` 自動折行)
 
-## Phase 2: UI 介面視覺設計 (UI-First Design - Static Mockup)
-- [ ] 設計主視窗 Layout (Main UI Window with Left Sidebar)：
-  - **左側側邊導覽選單欄 (Left Navigation Sidebar)**：包含「日曆儀表板」、「系統與喝水設定」、「Google 帳號與關於」分頁標籤
-  - **分頁一：日曆儀表板 (Calendar View)**：包含日曆、右側近期提醒欄位（大中小事件 30天/7天/3天 過濾）
-  - **分頁二：喝水與系統設定 (Settings View)**：喝水提醒間隔分鐘數、開機啟動開關、測試提醒按鈕
-- [ ] 設計行程新增/修改對話框 (Add/Edit Event Dialog)：包含「大/中/小」事件等級下拉選單
-- [ ] 設計螢幕右下角彈出通知視窗 (Toast Notification)：具備 3 秒淡出 (Fade-out) 動畫與現代感視覺
-- [ ] 請使用者進行 UI 畫面視覺確認與審核
+## 📌 Phase 2: 喝水提醒與系統整合 (已完成)
+- [x] 螢幕右下角 3 秒淡出 Toast 提醒視窗 (`ToastWindow`)
+- [x] Windows 系統訊息提示音 (`winsound.MessageBeep`)
+- [x] 1 秒實時動態背景倒數計時器 (左下角 `下次提醒: MM:SS 後` 每秒秒數更新)
+- [x] 設定頁面喝水提醒總開關與間隔設定
+- [x] 關閉視窗縮小至系統托盤 (`QSystemTrayIcon`)
+- [x] 開機自動啟動與 `--minimized` 靜默托盤啟動
+- [x] 單一實體防護鎖 (`QLocalServer` & `QLocalSocket` - 避免重複開啟進程，點擊捷徑喚醒原視窗)
 
-## Phase 3: 核心邏輯實現與自動化 (Logic Implementation & Automation)
-- [ ] 實現背景計時器邏輯 (預設 10 分鐘，支援 UI 即時更新間隔)
-- [ ] 實現 Windows 右下角淡入/淡出彈窗動畫與自動銷毀機制
-- [ ] 實現系統托盤 (System Tray) 圖示與背景執行 (Minimize to Tray)
-- [ ] 實現 Windows 開機自動啟動 (Auto-start on boot via Registry / Startup)
-- [ ] 實現 Google Calendar API 整合 (OAuth 2.0 授權登入、行程讀取、新增、編輯、等級註記 Extended Properties)
-- [ ] 實現事件等級篩選邏輯 (大事件 30天、中事件 7天、小事件 3天)
-- [ ] 整合設定檔持久化儲存 (JSON Config Persistent Storage)
-- [ ] 測試與例外處理 (無障礙啟動、防重複執行 Single Instance Lock)
+## 📌 Phase 3: Google Calendar 雲端雙向串接與進階防護 (已完成)
+- [x] Google OAuth2 API 授權整合 (`google-api-python-client`, `credentials.json`, `token.json`)
+- [x] `.gitignore` 檔案維護，徹底保護敏感憑證與 Token 不遭 Git 追蹤
+- [x] 背景非同步 QThread 載入 (`GoogleFetchWorker`) 與全局 IPv4 socket 逾時防護 (0.0 秒瞬間秒開，完全防卡死閃退)
+- [x] 背景無感自動續約 (Auto-Refresh `refresh_token`)
+- [x] 實質 API 健康度通訊檢查 (`check_connection()`)
+- [x] Google 日曆全色彩標籤級別對應 (紅:大30天 / 黃橘:中7天 / 綠:小3天)
+- [x] 編輯行程右下角三鈕區 (`[取消]` `[🗑️ 刪除行程]` `[儲存行程]`)
+- [x] 專屬暗黑紫紅刪除確認對話框 (`ConfirmDeleteDialog`)
+- [x] 雲端 2-Way 雙向讀取、新增 (`add_event`)、更新 (`update_event`) 與刪除 (`delete_event`)
+- [x] 桌面 256x256 高畫質紫光電光圖示 `icon.png` / `icon.ico`
+- [x] Windows 桌面捷徑 `Secretary 智能桌面小助理.lnk` 自動建立
