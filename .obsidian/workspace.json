@@ -188,8 +188,12 @@
       "bases:建立新的 base": false
     }
   },
-  "active": "353e6f4cec42ec19",
+  "active": "0482a826be604e35",
   "lastOpenFiles": [
+    "docs/dev_logs/20260809_phase4_planning_and_docs.md",
+    "docs/architecture.md",
+    "docs/progress.md",
+    "docs/dev_rules.md",
     "token.json",
     "assets/arrow_down.png",
     "assets/arrow_up.png",
@@ -203,8 +207,6 @@
     "assets/icon.ico",
     "assets/icon.png",
     "assets",
-    "docs/dev_logs/20260809_phase3_logic_and_automation.md",
-    "docs/dev_rules.md",
-    "docs/architecture.md"
+    "docs/dev_logs/20260809_phase3_logic_and_automation.md"
   ]
 }

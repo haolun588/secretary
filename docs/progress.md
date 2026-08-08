@@ -29,3 +29,10 @@
 - [x] 雲端 2-Way 雙向讀取、新增 (`add_event`)、更新 (`update_event`) 與刪除 (`delete_event`)
 - [x] 桌面 256x256 高畫質紫光電光圖示 `icon.png` / `icon.ico`
 - [x] Windows 桌面捷徑 `Secretary 智能桌面小助理.lnk` 自動建立
+
+## 📌 Phase 4: Google 日曆原生多階段提醒支援 (規劃中)
+- [ ] `utils/google_calendar.py`: 擴充 `add_event` / `update_event` 支援傳送 `reminders.overrides`（包含 10 分鐘、30 分鐘、1 小時、1 天等多階段提醒）
+- [ ] `utils/google_calendar.py`: 擴充 `get_events` / 行程解析讀取 Google API `reminders` 屬性
+- [ ] `ui/calendar_dialog.py`: 行程新增/編輯對話框新增提醒時間選單（支援自訂多階段提醒）
+- [ ] 跨平台與 Discord 整合相容：相容手機 App、網頁版與桌面端設定之提醒時間，棄用舊 `Calender` 專案獨特標籤，改為統一讀取 Google 原生 `reminders.overrides`
+

@@ -15,12 +15,12 @@ secretary/
 │   ├── nav_sidebar.py            # 左側選單欄元件
 │   ├── calendar_view.py          # 日曆頁面 (含大/中/小色彩標籤過濾提醒側邊欄)
 │   ├── settings_view.py          # 設定頁面 (喝水提醒間隔、開機自啟動控制)
-│   ├── calendar_dialog.py        # 行程新增/修改對話框
+│   ├── calendar_dialog.py        # 行程新增/修改對話框 (含提醒時間選單與刪除確認)
 │   └── toast_window.py           # 右下角喝水提醒彈窗 (含 3 秒淡出動畫)
 └── utils/
     ├── autostart.py              # 開機自啟動登錄檔控制模組 (支援 --minimized 靜默啟動)
     ├── config_manager.py         # 設定檔讀寫模組 (config.json 持久化)
-    └── google_calendar.py        # Google Calendar API 串接與 colorId 解析模組
+    └── google_calendar.py        # Google Calendar API 串接、colorId 解析與 reminders.overrides 原生提醒處理模組
 ```
 
 ## 2. 資料流與組件交互說明
@@ -30,5 +30,8 @@ secretary/
    - 當使用者點擊視窗右上角的 `✕` 關閉按鈕，`main_window.py` 攔截事件並呼叫 `event.ignore()` 與 `self.hide()`，視窗隱藏至系統托盤持續運作。
 3. **托盤右鍵選單**：
    - 提供「顯示主介面」、「測試喝水提醒」、「設定」、「退出程式」選項。
-4. **Google 日曆與提醒過濾**：
+4. **Google 日曆與色彩標籤過濾**：
    - `google_calendar.py` 解析 Google 日曆的 `colorId`（紅:大30天 / 黃:中7天 / 綠藍:小3天），並呈現於右側提醒欄。
+5. **Google 日曆原生多階段提醒 (reminders.overrides)**：
+   - 透過 `google_calendar.py` 傳遞與讀取 API 原生 `reminders` 屬性（如 10 分鐘前、1 小時前、1 天前等多重提醒分鐘數）。
+   - 確保在 `secretary` 桌面端、手機 Google 日曆 App 或網頁版設定的提醒皆能同步，並供背景/雲端 Bot 統一輪詢發送提醒。

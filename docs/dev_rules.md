@@ -18,6 +18,9 @@
     - 🔴 **紅色系 (Color ID 11 / Tomato)** ➔ **大事件 (提前 30 天/1個月顯示於右側提醒欄)**
     - 🟡 **黃色/橘色系 (Color ID 5 / Banana 或 Color ID 4 / Flamingo)** ➔ **中事件 (提前 7 天/1週顯示於右側提醒欄)**
     - 🟢 **綠色系 / 預設色 (Color ID 2 / Sage 或預設藍)** ➔ **小事件 (提前 3 天顯示於右側提醒欄)**
+- **Google 日曆原生多階段提醒 (reminders.overrides)**：
+  - 全面使用 Google API 原生 `reminders` 欄位傳遞與讀取通知時間（支援多選：如 10 分鐘前、30 分鐘前、1 小時前、1 天前）。
+  - 與手機 App 及網頁版設定完美跨平台同步，棄用外掛獨立文字標籤，供雲端 Bot 統一發送多階段推播。
 
 ## 2. 技術選型與約束 (Tech Stack & Constraints)
 - **作業系統目標**：Windows 10 / 11
@@ -31,3 +34,4 @@
 1. **Phase 1 (文件與規格)**：完成 `progress.md`, `dev_rules.md`, `architecture.md` 建立。
 2. **Phase 2 (UI 優先設計)**：完成靜態視覺設計。
 3. **Phase 3 (邏輯實現與自動化)**：實現定時器、托盤選單、關閉隱藏、開機靜默自啟、Google 日曆 API 串接與色彩標籤過濾。
+4. **Phase 4 (原生多階段提醒擴充)**：實現行程編輯對話框提醒選擇 UI 與 `reminders.overrides` 讀寫。
