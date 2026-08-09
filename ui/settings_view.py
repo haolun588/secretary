@@ -15,6 +15,7 @@ from utils.google_calendar import GoogleCalendarService
 class SettingsView(QWidget):
     google_connected_signal = pyqtSignal(list)
     water_enabled_signal = pyqtSignal(bool)
+    autostart_signal = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -171,7 +172,26 @@ class SettingsView(QWidget):
         layout.addWidget(water_group)
 
         # ----------------------------------------------------
-        # 2. Google 日曆 API 串接設定卡片
+        # 2. Windows 開機自啟動與系統設定卡片
+        # ----------------------------------------------------
+        system_group = QGroupBox("🚀 Windows 系統自動啟動偏好", container_widget)
+        s_layout = QVBoxLayout(system_group)
+        s_layout.setContentsMargins(24, 20, 24, 20)
+        s_layout.setSpacing(14)
+
+        self.chk_autostart = QCheckBox("開機自動啟動 Windows (Start automatically on Windows boot)", system_group)
+        self.chk_autostart.setChecked(True)
+        self.chk_autostart.toggled.connect(self.on_autostart_toggled)
+        s_layout.addWidget(self.chk_autostart)
+
+        s_desc = QLabel("💡 說明：勾選後將寫入 Windows 登錄檔，電腦開機後小助理將自動背景靜默啟動並隱藏於系統工作列圖示。", system_group)
+        s_desc.setStyleSheet("color: #a0a0ab; font-size: 12.5px; padding-left: 2px;")
+        s_layout.addWidget(s_desc)
+
+        layout.addWidget(system_group)
+
+        # ----------------------------------------------------
+        # 3. Google 日曆 API 串接設定卡片
         # ----------------------------------------------------
         google_group = QGroupBox("📅 Google Calendar 雲端串接", container_widget)
         g_layout = QVBoxLayout(google_group)
@@ -217,6 +237,9 @@ class SettingsView(QWidget):
     def on_water_enabled_toggled(self, checked):
         self.spin_interval.setEnabled(checked)
         self.water_enabled_signal.emit(checked)
+
+    def on_autostart_toggled(self, checked):
+        self.autostart_signal.emit(checked)
 
     def on_test_toast(self):
         interval = self.spin_interval.value()

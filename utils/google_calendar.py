@@ -67,55 +67,65 @@ class GoogleCalendarService:
                 except Exception as e:
                     print(f"[{datetime.now().isoformat()}] 清除舊 Token 失敗: {e}")
 
-            if not force_interactive and os.path.exists(self.token_file):
+            if os.path.exists(self.token_file):
                 try:
                     creds = Credentials.from_authorized_user_file(self.token_file, scopes)
                 except Exception as e:
                     print(f"[{datetime.now().isoformat()}] token.json 讀取異常: {e}")
                     creds = None
 
-            if creds and not creds.valid:
-                if creds.expired and creds.refresh_token:
+            if creds:
+                if creds.valid:
+                    self.service = build('calendar', 'v3', credentials=creds)
+                    self.is_connected = True
+                    return True
+                elif creds.expired and creds.refresh_token:
                     try:
-                        print(f"[{datetime.now().isoformat()}] [GoogleCalendar] 偵測到 Token 過期，正在背景自動續約...")
+                        print(f"[{datetime.now().isoformat()}] [GoogleCalendar] 偵測到 Token 過期，正在背景自動靜默續約...")
                         creds.refresh(Request(timeout=6))
                         with open(self.token_file, 'w', encoding='utf-8') as token:
                             token.write(creds.to_json())
                         print(f"[{datetime.now().isoformat()}] [GoogleCalendar] 🎉 背景自動續約成功！")
+                        self.service = build('calendar', 'v3', credentials=creds)
+                        self.is_connected = True
+                        return True
                     except Exception as e:
                         print(f"[{datetime.now().isoformat()}] 背景自動續約失敗: {e}")
                         creds = None
 
-            if not creds or not creds.valid:
-                if not os.path.exists(self.credentials_file):
-                    self.is_connected = False
-                    return False
+            # 若上面無法自動靜默登入 (例如 creds 無效或 refresh 失敗)
+            if not force_interactive:
+                print(f"[{datetime.now().isoformat()}] [GoogleCalendar] 背景靜默認證失敗，放棄自動彈出瀏覽器視窗")
+                self.is_connected = False
+                return False
 
-                flow = InstalledAppFlow.from_client_secrets_file(self.credentials_file, scopes)
-                try:
-                    creds = flow.run_local_server(
-                        host='localhost',
-                        port=8080,
-                        access_type='offline',
-                        prompt='consent',
-                        authorization_prompt_message='請在跳出的瀏覽器中完成 Google 帳號授權...',
-                        success_message='<h1 style="color:#8b5cf6;text-align:center;font-family:sans-serif;margin-top:50px;">🎉 授權成功！</h1><p style="text-align:center;color:#666;">您現在可以關閉此瀏覽器分頁，並回到 Secretary 桌面小助理。</p>',
-                        open_browser=True
-                    )
-                except Exception as e_server:
-                    creds = flow.run_local_server(
-                        port=0,
-                        access_type='offline',
-                        prompt='consent',
-                        success_message='<h1 style="color:#8b5cf6;text-align:center;">🎉 授權成功！</h1>',
-                        open_browser=True
-                    )
+            if not os.path.exists(self.credentials_file):
+                self.is_connected = False
+                return False
 
-                if creds:
-                    with open(self.token_file, 'w', encoding='utf-8') as token:
-                        token.write(creds.to_json())
+            flow = InstalledAppFlow.from_client_secrets_file(self.credentials_file, scopes)
+            try:
+                creds = flow.run_local_server(
+                    host='localhost',
+                    port=8080,
+                    access_type='offline',
+                    prompt='consent',
+                    authorization_prompt_message='請在跳出的瀏覽器中完成 Google 帳號授權...',
+                    success_message='<h1 style="color:#8b5cf6;text-align:center;font-family:sans-serif;margin-top:50px;">🎉 授權成功！</h1><p style="text-align:center;color:#666;">您現在可以關閉此瀏覽器分頁，並回到 Secretary 桌面小助理。</p>',
+                    open_browser=True
+                )
+            except Exception as e_server:
+                creds = flow.run_local_server(
+                    port=0,
+                    access_type='offline',
+                    prompt='consent',
+                    success_message='<h1 style="color:#8b5cf6;text-align:center;">🎉 授權成功！</h1>',
+                    open_browser=True
+                )
 
             if creds and creds.valid:
+                with open(self.token_file, 'w', encoding='utf-8') as token:
+                    token.write(creds.to_json())
                 self.service = build('calendar', 'v3', credentials=creds)
                 self.is_connected = True
                 return True

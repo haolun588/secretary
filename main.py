@@ -55,8 +55,12 @@ class SecretaryApp:
 
         # 狀態控制變數
         self.water_enabled = self.config.get("water_enabled", True)
+        self.autostart_enabled = self.config.get("autostart", True)
         self.interval_minutes = self.config.get("interval_minutes", 10)
         self.remaining_seconds = self.interval_minutes * 60
+
+        # 開機自啟動登錄檔同步
+        AutoStartManager.set_autostart(self.autostart_enabled)
 
         # 維護作用中的 Toast 物件引用清單，防記憶體垃圾回收崩潰
         self.active_toasts = []
@@ -65,6 +69,7 @@ class SecretaryApp:
 
         # 設定頁面初始化狀態
         self.window.settings_view.chk_water_enabled.setChecked(self.water_enabled)
+        self.window.settings_view.chk_autostart.setChecked(self.autostart_enabled)
         self.window.settings_view.spin_interval.setValue(self.interval_minutes)
 
         # 實時 1 秒背景倒數計時器
@@ -77,6 +82,7 @@ class SecretaryApp:
 
         # 連接設定訊號
         self.window.settings_view.water_enabled_signal.connect(self.on_water_enabled_toggled)
+        self.window.settings_view.autostart_signal.connect(self.on_autostart_toggled)
         self.window.settings_view.spin_interval.valueChanged.connect(self.on_interval_changed)
 
     def init_single_instance_server(self):
@@ -189,6 +195,12 @@ class SecretaryApp:
         ConfigManager.save_config(self.config)
         if enabled:
             self.remaining_seconds = self.interval_minutes * 60
+
+    def on_autostart_toggled(self, enabled):
+        self.autostart_enabled = enabled
+        self.config["autostart"] = enabled
+        ConfigManager.save_config(self.config)
+        AutoStartManager.set_autostart(enabled)
 
     def on_interval_changed(self, minutes):
         self.interval_minutes = minutes
