@@ -3,7 +3,7 @@ import sys
 import subprocess
 
 def create_all_shortcuts():
-    project_dir = r"c:\GitHub\secretary"
+    project_dir = os.path.dirname(os.path.abspath(__file__))
     main_script = os.path.join(project_dir, "main.py")
     icon_file = os.path.join(project_dir, "assets", "icon.ico")
     
