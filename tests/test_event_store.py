@@ -5,7 +5,7 @@ import httplib2
 import pytest
 
 pytest.importorskip("PyQt6.QtCore")
-from PyQt6.QtCore import QCoreApplication  # noqa: E402
+from PyQt6.QtCore import QCoreApplication, QEvent  # noqa: E402
 
 from services import event_store as es  # noqa: E402
 from services.event_store import (  # noqa: E402
@@ -483,13 +483,15 @@ def test_events_changed_payload_is_copy(setup):
 # ---- ThreadPoolRunner 跨執行緒測試 ----
 
 def _wait(predicate, timeout=3.0):
+    # 只派送 MetaCall（QueuedConnection 回呼）事件；不用 processEvents()，
+    # 以免處理到其他測試遺留的 DeferredDelete 等事件而造成 access violation。
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        QCoreApplication.processEvents()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.MetaCall)
         if predicate():
             return True
         time.sleep(0.005)
-    QCoreApplication.processEvents()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.MetaCall)
     return predicate()
 
 
