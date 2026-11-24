@@ -36,7 +36,7 @@ secretary/
 │   ├── theme.py                  # 設計 token（顏色、字級、間距、圓角、版面尺寸、PRIORITY_*）與 qss() 範本替換；純資料，不依賴 PyQt6
 │   ├── styles.py                 # 全域 QSS（依元件分段：按鈕、輸入、開關、選單、捲軸、導覽、工具列、面板、對話框、設定、toast…）、build_palette、apply_app_style、qcolor、make_font、fit_text、repolish
 │   ├── icons.py                  # SVG 圖示載入與上色：icon()/pixmap()，處理高 DPI；QSS 用的上色圖示匯出
-│   ├── components.py             # 共用元件：IconButton、SegmentedControl、SyncStatusBadge、LevelDot、level_color、sync_state_presentation
+│   ├── components.py             # 共用元件：IconButton、SegmentedControl、SyncStatusBadge、LevelDot、level_color、level_bg、level_text、sync_state_presentation
 │   ├── nav_sidebar.py            # 52px 圖示導覽列：Logo／日曆／喝水／設定（checkable 互斥）＋底部喝水倒數（set_countdown、format_countdown）
 │   ├── main_window.py            # 主視窗外框：NavSidebar + QStackedWidget(CalendarView, SettingsView)，首次顯示啟用深色標題列，closeEvent 縮到托盤
 │   ├── calendar_view.py          # 日曆頁：工具列（標題、‹ ›、今天、月/週/日、同步徽章、新增）+ 視圖區 + 右側面板；串接 EventStore

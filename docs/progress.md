@@ -2,7 +2,7 @@
 
 ## 📌 Phase 1: 基礎架構與桌面 UI 介面 (已完成；UI 已由階段 C 取代)
 - [x] PyQt6 專案目錄結構與主程式建立 (`main.py`, `ui/`)
-- [x] 暗黑高顏值主題與電光紫配色 (`#121217`, `#1c1c24`, `#8b5cf6`)（已由階段 C 的 `ui/theme.py` token 取代）
+- [x] 暗黑高顏值主題與電光紫配色 (`#121217`, `#1c1c24`, `#8b5cf6`)（已由階段 C 的 `ui/theme.py` token 取代；現行為深藍底＋青綠主色，見「配色改版」）
 - [x] 左側導覽列 `NavSidebar` (日曆與行程 / 喝水與設定)（階段 C 改為 52px 圖示導覽列）
 - [x] 中間月曆 `CalendarView` (440px 寬、1:1 置中、週末電光紫字體)（階段 C 改為自繪月／週／日視圖，已無 QCalendarWidget）
 - [x] 右側提醒面板 `SidebarFrame` (340px 緊貼右側、雙行頂部導覽列)（階段 C 改為 300px `SidePanel`）
@@ -27,7 +27,7 @@
 - [x] 編輯行程右下角三鈕區 (`[取消]` `[🗑️ 刪除行程]` `[儲存行程]`)
 - [x] 專屬暗黑紫紅刪除確認對話框 (`ConfirmDeleteDialog`)
 - [x] Google 日曆讀取、新增 (`insert_event`)、更新 (`patch_event`) 與刪除 (`delete_event`) 功能（`services/google_client.py`，經 `EventStore` 呼叫；同步缺陷已於階段 B 修正）
-- [x] 桌面 256x256 高畫質紫光電光圖示 `icon.png` / `icon.ico`
+- [x] 桌面 256x256 高畫質電光圖示 `icon.png` / `icon.ico`（配色改版後改為青綠底）
 - [x] Windows 桌面捷徑 `Secretary 智能桌面小助理.lnk` 自動建立
 
 ## ⚠️ 已知問題（2026-11-24 審查）
@@ -55,6 +55,7 @@
 21. `assets/arrow_up.png`、`arrow_down.png` 與 `scripts/arrow_generator.py` 已無程式引用，`utils/paths.qss_url` 亦已無 UI 使用，留待階段 D 清理。
 22. `tests/test_event_store.py` 的 `processEvents` 會遺留事件，全套件中曾造成 access violation（階段 C 新測試已避開），待階段 D 處理。
 23. `DatePopupButton` 的彈出月曆仍是 `QCalendarWidget`（僅供挑日期），未做預覽。
+24. 配色改版後，中等級（琥珀 `#fbbf24`）的半透明底疊在深藍 SURFACE_2 上偏橄欖褐色，與大（玫瑰）、小（藍）相比不夠乾淨，之後可能需調整 `PRIORITY_BG` 的中等級值。
 
 ## 📌 階段 A: 基礎建設 (已完成，2026-11-24)
 - [x] `utils/logger.py`：`get_logger(__name__)`，RotatingFileHandler 寫入 `data/logs/secretary.log`，pythonw 無 stdout 時不加 StreamHandler，建立目錄或開檔失敗不崩潰
@@ -80,6 +81,15 @@
 - [x] 對話框、設定、toast、托盤（e3a32ef）：`CalendarDialog` 2 欄排版、`ConfirmDialog`、段落式 `SettingsView`（新增「關閉視窗時縮到系統匣」與 Google 登入／登出）、`ToastWindow`／`ToastStack`、`tray_menu`、`WaterCountdown`（延後 10 分鐘／已喝）、`save_config_or_warn`、`main.py` 套用全域樣式
 - 測試狀態：`python -m pytest -q`：382 passed。
 - 未實機驗證：實際畫面與字型、深色標題列（主視窗與對話框）、高 DPI（125%/150% 下圖示與 1px 線）、最小視窗 960×620、月週日切換與 ‹ › 今天、雙擊新增／點行程編輯、對話框全天切換與儲存回寫、刪除確認、toast 按鈕（延後 10 分鐘、已喝）與 hover 暫停、多則 toast 堆疊、托盤選單樣式、設定頁各開關寫入 config、Google 登入／登出、關閉視窗縮到系統匣。
+
+## 📌 配色改版 (2026-11-25 完成；未 commit，未實機驗證)
+- [x] 整體色調改為深藍底（BG `#0d1322` 等）＋青綠主色（ACCENT `#2dd4bf`）；`TEXT_ON_ACCENT` 改深色 `#04201c`，新增 `TEXT_ON_DANGER` `#ffffff` 供 danger 按鈕；DANGER／SUCCESS／WARNING 值調整
+- [x] 行程等級色與語意色脫鉤：`PRIORITY` 大 `#fb7185` 玫瑰、中 `#fbbf24` 琥珀、小 `#60a5fa` 藍；新增 `PRIORITY_BG` / `PRIORITY_BG_HOVER` / `PRIORITY_TEXT`；`ui/components.py` 新增 `level_bg()`、`level_text()`
+- [x] 月視圖 chip、週／日視圖行程區塊、全天 chip 改為整格依等級上色（先鋪不透明 SURFACE_2 再疊半透明 level_bg，文字用 level_text，保留左側 LEVEL_BAR 色條）
+- [x] `scripts/icon_generator.py`、`scripts/arrow_generator.py` 改用 theme token 並補 `sys.path`，重新產生 `assets/icon.png`、`icon.ico`、`arrow_up.png`、`arrow_down.png`（app 圖示改為青綠底）
+- [x] `services/google_client.py` 的 OAuth 授權成功頁改用 theme 色值並改為深底
+- [x] 新增測試：`PRIORITY_*` 格式、WCAG 對比度、`level_bg`/`level_text` fallback；`python -m pytest -q`：389 passed
+- 未實機驗證：實際畫面配色與對比、月／週／日整格上色觀感、新 app 圖示與授權成功頁。
 
 ## 📌 Phase 4: Google 日曆原生多階段提醒支援 (規劃中)
 - [ ] `services/event_mapping.py` / `services/google_client.py`: 擴充 `to_google_body` / `build_patch_body` 支援傳送 `reminders.overrides`（包含 10 分鐘、30 分鐘、1 小時、1 天等多階段提醒）
