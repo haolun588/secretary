@@ -3,11 +3,6 @@ import os
 from utils import paths
 
 
-def test_qss_url_converts_backslashes():
-    assert paths.qss_url("C:\\a\\b\\c.png") == "C:/a/b/c.png"
-    assert paths.qss_url("/a/b.png") == "/a/b.png"
-
-
 def _setup(monkeypatch, tmp_path):
     project = tmp_path / "project"
     data = project / "data"

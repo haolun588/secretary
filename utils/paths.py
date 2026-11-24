@@ -30,11 +30,6 @@ def asset_path(name):
     return os.path.join(ASSETS_DIR, name)
 
 
-def qss_url(path):
-    """回傳可放入 QSS url(...) 的路徑 (反斜線轉正斜線)"""
-    return str(path).replace("\\", "/")
-
-
 def ensure_data_dirs():
     """建立 data/ 與 data/logs/"""
     os.makedirs(DATA_DIR, exist_ok=True)
