@@ -144,7 +144,10 @@ def test_patch_priority_unchanged_no_color():
 
 def test_patch_priority_changed_sends_color():
     new = {**_base(), "priority": "major"}
-    assert m.build_patch_body(_base(), new, TZ8) == {"colorId": "11"}
+    assert m.build_patch_body(_base(), new, TZ8) == {
+        "colorId": "11",
+        "extendedProperties": {"private": {"secretary_priority": "major"}},
+    }
 
 
 def test_patch_location_notes():
@@ -201,3 +204,58 @@ def test_patch_text_sends_stripped_new_value():
     new = {**_base(), "title": "  X  ", "location": " L ", "notes": " N "}
     body = m.build_patch_body(_base(), new, TZ8)
     assert body == {"summary": "X", "location": "L", "description": "N"}
+
+
+def _item(color=None, ext="__none__"):
+    item = {"id": "a", "start": {"date": "2026-03-10"}}
+    if color is not None:
+        item["colorId"] = color
+    if ext != "__none__":
+        item["extendedProperties"] = ext
+    return item
+
+
+def test_priority_from_item_ext_overrides_color():
+    item = _item("11", {"private": {"secretary_priority": "minor"}})
+    assert m.priority_from_item(item) == "minor"
+    assert m.from_google(item, TZ8)["priority"] == "minor"
+
+
+@pytest.mark.parametrize("bad", ["urgent", 123, "", None, ["major"]])
+def test_priority_from_item_invalid_ext_falls_back_to_color(bad):
+    item = _item("11", {"private": {"secretary_priority": bad}})
+    assert m.priority_from_item(item) == "major"
+
+
+@pytest.mark.parametrize("ext", [
+    "__none__", None, {}, {"private": None}, {"private": {}}, {"shared": {}}, "oops",
+    {"private": "oops"},
+])
+def test_priority_from_item_missing_ext_falls_back_to_color(ext):
+    assert m.priority_from_item(_item("5", ext)) == "medium"
+    assert m.priority_from_item(_item(None, ext), default="minor") == "minor"
+
+
+def test_to_google_body_has_extended_priority():
+    for pri in ("major", "medium", "minor"):
+        ev = {"title": "T", "all_day": True, "start": "2026-03-10", "priority": pri}
+        body = m.to_google_body(ev, TZ8)
+        assert body["extendedProperties"] == {"private": {"secretary_priority": pri}}
+
+
+def test_to_google_body_unknown_priority_writes_minor():
+    ev = {"title": "T", "all_day": True, "start": "2026-03-10", "priority": "weird"}
+    body = m.to_google_body(ev, TZ8)
+    assert body["extendedProperties"]["private"]["secretary_priority"] == "minor"
+    assert body["colorId"] == "2"
+
+
+def test_patch_priority_unchanged_no_extended_properties():
+    new = {**_base(), "title": "X"}
+    assert "extendedProperties" not in m.build_patch_body(_base(), new, TZ8)
+
+
+def test_from_google_then_patch_same_data_is_empty():
+    item = _item("11", {"private": {"secretary_priority": "minor"}})
+    ev = m.from_google(item, TZ8)
+    assert m.build_patch_body(ev, dict(ev), TZ8) == {}

@@ -6,6 +6,9 @@ Google 事件 <-> 內部 event dict 的純函式對應。不 import Qt、不連�
     id, title, all_day, start, end, priority, location, notes, color_id
     - all_day: start/end 為 "YYYY-MM-DD"，end 含當天（= Google end.date - 1 天）
     - 定時:    start/end 為 "YYYY-MM-DDTHH:MM:SS"（已轉為本機時區的 naive 字串）
+
+等級（priority）來源：以 extendedProperties.private.secretary_priority 為主，
+缺少或不合法時退回 colorId 判斷（顏色只當顯示與備援）。
 """
 
 from datetime import date, datetime, time, timedelta
@@ -25,6 +28,9 @@ PRIORITY_COLOR_MAP = {
     "minor": "2",
 }
 
+PRIORITY_PROP_KEY = "secretary_priority"
+VALID_PRIORITIES = frozenset(PRIORITY_COLOR_MAP)
+
 DEFAULT_TITLE = "無標題行程"
 
 
@@ -33,6 +39,24 @@ def priority_from_color(color_id, default="minor"):
     if color_id is None or color_id == "":
         return default
     return COLOR_PRIORITY_MAP.get(str(color_id), default)
+
+
+def priority_from_item(item, default="minor"):
+    """Google event resource -> 等級。
+    extendedProperties.private.secretary_priority 合法時優先；否則退回 colorId。"""
+    ext = item.get("extendedProperties")
+    private = ext.get("private") if isinstance(ext, dict) else None
+    value = private.get(PRIORITY_PROP_KEY) if isinstance(private, dict) else None
+    if isinstance(value, str) and value in VALID_PRIORITIES:
+        return value
+    return priority_from_color(item.get("colorId"), default)
+
+
+def extended_properties_for(priority):
+    """等級 -> Google extendedProperties；未知等級以 "minor" 寫入"""
+    if priority not in VALID_PRIORITIES:
+        priority = "minor"
+    return {"private": {PRIORITY_PROP_KEY: priority}}
 
 
 def color_from_priority(priority):
@@ -99,7 +123,7 @@ def from_google(item, tz=None):
         "all_day": all_day,
         "start": start,
         "end": end,
-        "priority": priority_from_color(color_id),
+        "priority": priority_from_item(item),
         "location": item.get("location", "") or "",
         "notes": item.get("description", "") or "",
         "color_id": str(color_id) if color_id is not None else None,
@@ -137,6 +161,7 @@ def to_google_body(ev, tz=None):
         "location": ev.get("location", "") or "",
         "description": ev.get("notes", "") or "",
         "colorId": color_from_priority(ev.get("priority", "minor")),
+        "extendedProperties": extended_properties_for(ev.get("priority", "minor")),
         "start": start,
         "end": end,
     }
@@ -162,6 +187,7 @@ def build_patch_body(old, new, tz=None):
         body["description"] = new_notes
     if new.get("priority") != old.get("priority"):
         body["colorId"] = color_from_priority(new.get("priority", "minor"))
+        body["extendedProperties"] = extended_properties_for(new.get("priority", "minor"))
 
     old_all_day = _is_all_day(old)
     new_all_day = _is_all_day(new)
