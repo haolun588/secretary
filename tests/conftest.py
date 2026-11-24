@@ -1,7 +1,11 @@
 import os
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")  # 必須在任何 Qt 匯入之前
 import shutil
 import sys
 import tempfile
+
+import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
@@ -18,3 +22,16 @@ _logger_mod._default_log_dir = lambda: _TEST_LOG_DIR
 def pytest_sessionfinish(session, exitstatus):
     _logger_mod._reset_for_tests()
     shutil.rmtree(_TEST_LOG_DIR, ignore_errors=True)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _session_qapplication():
+    """整個測試 session 持有同一個 QApplication（offscreen），避免模組間因 QCoreApplication / 被回收造成不一致。"""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    try:
+        from PyQt6.QtWidgets import QApplication
+    except Exception:
+        yield None
+        return
+    app = QApplication.instance() or QApplication([])
+    yield app

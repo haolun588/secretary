@@ -45,15 +45,25 @@ TEXT_MUTED = "#6b6b78"
 ACCENT = "#8b7cf6"
 ACCENT_HOVER = "#7a6aef"
 ACCENT_MUTED = "rgba(139,124,246,0.14)"
+ACCENT_SOFT = "rgba(139,124,246,0.08)"
+TEXT_ON_ACCENT = "#ffffff"
+
+# 互動狀態疊色
+HOVER = "rgba(255,255,255,0.04)"
+PRESSED = "rgba(255,255,255,0.07)"
+DANGER_MUTED = "rgba(229,72,77,0.14)"
+OVERLAY = "rgba(0,0,0,0.45)"
 
 # 語意色
 DANGER = "#e5484d"
+DANGER_HOVER = "#cd3a3f"
 SUCCESS = "#30a46c"
 WARNING = "#f5a524"
 PRIORITY = {"major": DANGER, "medium": WARNING, "minor": SUCCESS}
 
 # 字型
 FONT_FAMILY = "'Segoe UI', 'Microsoft JhengHei UI', sans-serif"
+FONT_FAMILIES = ("Segoe UI", "Microsoft JhengHei UI", "Microsoft JhengHei")  # 給 QFont.setFamilies 用（tuple 不進 TOKENS）
 FONT_XS = 12
 FONT_SM = 13
 FONT_MD = 15
@@ -74,6 +84,29 @@ SPACE_6 = 32
 RADIUS_SM = 6
 RADIUS_MD = 10
 RADIUS_LG = 14
+
+# 版面固定尺寸（px）
+NAV_WIDTH = 52
+SIDE_PANEL_WIDTH = 300
+WINDOW_W = 1180
+WINDOW_H = 740
+WINDOW_MIN_W = 960
+WINDOW_MIN_H = 620
+CONTROL_H = 32
+ICON_SM = 16
+ICON_MD = 20
+NAV_BTN = 36
+LEVEL_BAR = 3
+TOAST_WIDTH = 340
+DIALOG_WIDTH = 520
+HOUR_HEIGHT = 48
+TIME_GUTTER = 52
+MONTH_CHIP_H = 20
+SWITCH_W = 36
+
+# 行程等級
+PRIORITY_LABEL = {"major": "大", "medium": "中", "minor": "小"}
+PRIORITY_WINDOW_DAYS = {"major": 30, "medium": 7, "minor": 3}
 
 _TOKEN_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
