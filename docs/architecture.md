@@ -9,7 +9,6 @@ secretary/
 ├── .gitignore
 ├── assets/                       # 圖示資源
 │   ├── icon.ico / icon.png       # 應用程式圖示
-│   ├── arrow_up.png / arrow_down.png  # 已無程式引用，留待階段 D 清理
 │   └── icons/*.svg               # UI 線條圖示（專案自繪，24 格、stroke currentColor；風格參考 Lucide（ISC 授權），非複製 Lucide 原始檔）
 ├── docs/
 │   ├── dev_rules.md              # 技術規範與設計指南（含 UI 規範、視覺預覽）
@@ -22,11 +21,11 @@ secretary/
 ├── main.py                       # 主程式入口：托盤、單一實例、喝水計時（WaterCountdown）、EventStore 建立與注入、toast 堆疊、套用全域樣式
 ├── scripts/                      # 開發/一次性工具腳本
 │   ├── create_shortcut.py        # 建立桌面捷徑與啟動 .bat
-│   ├── arrow_generator.py        # 箭頭圖示產生器（已無程式引用，待階段 D 清理）
 │   ├── icon_generator.py         # 應用程式圖示產生器
 │   └── render_preview.py         # offscreen 視覺預覽：假資料（FakeStore / FakeConfig）渲染各畫面成 PNG，不連網、不讀 data/
 ├── tests/                        # 自動化測試 (pytest；不連網、不開可見 GUI、不碰真實 data/)
 │   ├── conftest.py               # 專案根加入 sys.path、日誌導向暫存目錄、session 範圍單一 offscreen QApplication
+│   ├── test_autostart.py         # autostart 同步邏輯（假 winreg，不碰真 Registry）
 │   └── test_*.py
 ├── services/                     # Google 日曆同步層（不含 UI 繪製）
 │   ├── event_mapping.py          # 純函式：色彩<->等級、Google event<->內部 dict、全天 end 換算、patch body、month_range、系統時區
@@ -50,10 +49,10 @@ secretary/
 │   ├── toast_window.py           # ToastWindow（info/water/danger、按鈕、關閉鈕、hover 暫停）與 ToastStack（多則堆疊與重排）
 │   └── tray_menu.py              # 托盤右鍵選單建構（圖示、無 emoji）
 └── utils/
-    ├── autostart.py              # 開機自啟動登錄檔控制模組 (支援 --minimized 靜默啟動)
+    ├── autostart.py              # 開機自啟動登錄檔控制模組 (支援 --minimized 靜默啟動)；預設關閉，啟動時 `sync` 僅在 Registry 與設定不一致時才寫入／刪除（`plan_sync` 純函式決策，`get_registered_command` 唯讀）
     ├── config_manager.py         # 設定檔讀寫 (config.json)；save_config_or_warn 寫入失敗時提示使用者
     ├── logger.py                 # 日誌設定 (get_logger，RotatingFileHandler 寫入 data/logs/)
-    ├── paths.py                  # 集中路徑定義（qss_url 已無 UI 使用，待階段 D 清理）
+    ├── paths.py                  # 集中路徑定義
     ├── water_timer.py            # WaterCountdown：喝水倒數純邏輯（tick／snooze／reset，無 Qt）
     └── win_titlebar.py           # enable_dark_titlebar：DWM 深色標題列，失敗回傳 False 不 raise
 ```

@@ -38,7 +38,7 @@
 5. ~~新增/編輯/刪除與啟動時 `check_connection` 在主執行緒阻塞。~~（2026-11-24 階段 B 已處理：全部經 `EventStore` 的單執行緒 `ThreadPoolRunner` 在背景執行，結果以 QueuedConnection 回主執行緒）
 6. ~~背景 fetch 與 UI 共用同一個 service，httplib2 非 thread-safe。~~（2026-11-24 階段 B 已處理：每個 worker 自建 service，`httplib2.Http(timeout=15)` + `AuthorizedHttp`，且 API 呼叫由單執行緒 pool 序列化）
 7. ~~日誌使用 `print`，在 `pythonw` 下全部遺失。~~（2026-11-24 階段 A 已處理：改用 `utils/logger.py`，寫入 `data/logs/secretary.log`）
-8. autostart 預設開啟，且每次啟動都寫入 Registry。（待階段 D 處理）
+8. ~~autostart 預設開啟，且每次啟動都寫入 Registry。~~（2026-11-25 階段 D 已處理：預設改為關閉；啟動改呼叫 `AutoStartManager.sync`，只在 Registry 與設定不一致時才寫入或刪除；寫入失敗以 danger toast 提示。注意：已存有 `autostart: true` 的舊 config 仍維持開啟）
 9. ~~只抓 `timeMin=now`、`maxResults=100`，未處理 `nextPageToken`；過去日期空白。~~（2026-11-24 階段 B 已處理：改拉取目前顯示月份前後各一個月（`ensure_month`），切換月份自動拉取，處理分頁，過去日期可顯示）
 10. ~~箭頭圖示 QSS 使用相對路徑 `assets/...`~~（2026-11-24 工作區整理已修正：改用 `utils/paths.py` 絕對路徑）。
 11. ~~尚無自動化測試。~~（2026-11-24 階段 A 已建立 `tests/` 測試骨架，`python -m pytest` 全數通過）
@@ -52,8 +52,8 @@
 
 19. 週視圖 7 欄時，3 筆以上重疊的行程欄位很窄，僅顯示標題前幾字，需靠 tooltip 看全文。
 20. offscreen 預覽的中文需由 `render_preview` 載入 `msjh.ttc`；實機不受影響。
-21. `assets/arrow_up.png`、`arrow_down.png` 與 `scripts/arrow_generator.py` 已無程式引用，`utils/paths.qss_url` 亦已無 UI 使用，留待階段 D 清理。
-22. `tests/test_event_store.py` 的 `processEvents` 會遺留事件，全套件中曾造成 access violation（階段 C 新測試已避開），待階段 D 處理。
+21. ~~`assets/arrow_up.png`、`arrow_down.png` 與 `scripts/arrow_generator.py` 已無程式引用，`utils/paths.qss_url` 亦已無 UI 使用。~~（2026-11-25 階段 D 已處理：刪除兩張箭頭圖、`arrow_generator.py`，移除 `qss_url` 與其測試）
+22. ~~`tests/test_event_store.py` 的 `processEvents` 會遺留事件，全套件中曾造成 access violation。~~（2026-11-25 階段 D 已處理：`_wait` 改用 `QCoreApplication.sendPostedEvents(None, QEvent.Type.MetaCall)`，只派送 QueuedConnection 回呼，不處理其他測試遺留的 DeferredDelete）
 23. `DatePopupButton` 的彈出月曆仍是 `QCalendarWidget`（僅供挑日期），未做預覽。
 24. 配色改版後，中等級（琥珀 `#fbbf24`）的半透明底疊在深藍 SURFACE_2 上偏橄欖褐色，與大（玫瑰）、小（藍）相比不夠乾淨，之後可能需調整 `PRIORITY_BG` 的中等級值。
 
@@ -90,6 +90,15 @@
 - [x] `services/google_client.py` 的 OAuth 授權成功頁改用 theme 色值並改為深底
 - [x] 新增測試：`PRIORITY_*` 格式、WCAG 對比度、`level_bg`/`level_text` fallback；`python -m pytest -q`：389 passed
 - 未實機驗證：實際畫面配色與對比、月／週／日整格上色觀感、新 app 圖示與授權成功頁。
+
+## 📌 階段 D: autostart 與清理 (2026-11-25 完成；未 commit，未實機驗證)
+- [x] autostart（已知問題 8）：預設關閉（`config_manager`、`main.py`、`settings_view`）；`utils/autostart.py` 新增 `get_registered_command()`（KEY_READ 唯讀）、純函式 `plan_sync(desired, current_cmd, expected_cmd)`、`AutoStartManager.sync(desired)`；啟動改呼叫 `sync`，僅在不一致時寫入／刪除（路徑變動自動修正）；`set_autostart` 權限由 KEY_ALL_ACCESS 縮為 KEY_SET_VALUE 並 try/finally CloseKey
+- [x] 失敗提示：啟動同步失敗或設定頁切換失敗以 danger toast 提示；切換失敗時還原核取方塊且不寫 config
+- [x] 清理（已知問題 21）：刪除 `assets/arrow_up.png`、`arrow_down.png`、`scripts/arrow_generator.py`；移除 `utils/paths.qss_url` 與其測試
+- [x] 測試穩定（已知問題 22）：`test_event_store._wait` 改用 `sendPostedEvents(None, MetaCall)`
+- [x] 新增 `tests/test_autostart.py`（12 個測試，假 winreg，不碰真 Registry）；`test_settings_view::test_autostart_signal` 因預設改 False 調整切換順序
+- 測試狀態：`python -m pytest -q`：405 passed。
+- 未實機驗證：`main.py` 的 `on_autostart_toggled` 需整個 GUI 才能測，未寫單測。待驗證：設定頁開關開機啟動後 Registry 正確、重開機自啟並最小化、舊 config 升級後行為。
 
 ## 📌 Phase 4: Google 日曆原生多階段提醒支援 (規劃中)
 - [ ] `services/event_mapping.py` / `services/google_client.py`: 擴充 `to_google_body` / `build_patch_body` 支援傳送 `reminders.overrides`（包含 10 分鐘、30 分鐘、1 小時、1 天等多階段提醒）
