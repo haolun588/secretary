@@ -101,6 +101,28 @@ def pixmap(name, color=theme.TEXT_SECONDARY, size=theme.ICON_MD):
     return _render(name, color, int(size), _device_pixel_ratio())
 
 
+@lru_cache(maxsize=16)
+def _render_logo(size, dpr):
+    px = max(1, int(round(size * dpr)))
+    image = QImage(px, px, QImage.Format.Format_ARGB32_Premultiplied)
+    image.fill(Qt.GlobalColor.transparent)
+    renderer = QSvgRenderer(asset_path("logo.svg"))
+    if not renderer.isValid():
+        logger.warning("找不到或無法解析 assets/logo.svg")
+    painter = QPainter(image)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    renderer.render(painter)
+    painter.end()
+    pm = QPixmap.fromImage(image)
+    pm.setDevicePixelRatio(dpr)
+    return pm
+
+
+def logo_pixmap(size):
+    """以原色渲染 assets/logo.svg（品牌 logo，不重新上色）；邏輯尺寸 size，依 devicePixelRatio 放大。"""
+    return _render_logo(int(size), _device_pixel_ratio())
+
+
 def icon(name, color=theme.TEXT_SECONDARY, size=theme.ICON_MD, active_color=None):
     """建立 QIcon；active_color 會加上 Selected / On / Active 狀態的 pixmap。"""
     ic = QIcon()
@@ -118,6 +140,7 @@ def icon(name, color=theme.TEXT_SECONDARY, size=theme.ICON_MD, active_color=None
 def clear_caches():
     """清除 SVG 文字與 pixmap 快取（應用程式結束前呼叫，避免 QPixmap 晚於 QApplication 釋放）。"""
     _render.cache_clear()
+    _render_logo.cache_clear()
     load_svg.cache_clear()
 
 

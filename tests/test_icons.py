@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QApplication  # noqa: E402
 from ui import icons, theme  # noqa: E402
 from utils.paths import ASSETS_DIR  # noqa: E402
 
-REQUIRED = ["logo", "calendar", "droplet", "settings", "chevron-left", "chevron-right",
+REQUIRED = ["calendar", "droplet", "settings", "chevron-left", "chevron-right",
             "chevron-down", "chevron-up", "plus", "refresh", "check", "cloud-off", "alert",
             "map-pin", "clock", "x", "trash", "user", "bell", "log-out", "log-in", "window",
             "power"]

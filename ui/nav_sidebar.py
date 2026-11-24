@@ -80,7 +80,7 @@ class NavSidebar(QFrame):
         self.logo = QLabel(self)
         self.logo.setObjectName("NavLogo")
         logo_size = theme.ICON_MD + theme.SPACE_1
-        self.logo.setPixmap(icons.pixmap("logo", theme.ACCENT, logo_size))
+        self.logo.setPixmap(icons.logo_pixmap(logo_size))
         self.logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.logo.setFixedHeight(theme.NAV_BTN)
         layout.addWidget(self.logo, 0, align)

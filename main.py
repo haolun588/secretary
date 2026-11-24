@@ -41,10 +41,25 @@ def get_app_icon():
     if os.path.exists(icon_path):
         return QIcon(icon_path)
 
-    return QIcon(icons.pixmap("logo", theme.ACCENT, theme.APP_ICON))
+    return QIcon(icons.logo_pixmap(theme.APP_ICON))
+
+APP_USER_MODEL_ID = "Secretary.DesktopAssistant"
+
+
+def set_app_user_model_id():
+    """Windows：固定 AppUserModelID，讓工作列使用本程式圖示且不被歸到 Python 群組。"""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+    except Exception:
+        logger.exception("設定 AppUserModelID 失敗，工作列圖示可能顯示為 Python")
+
 
 class SecretaryApp:
     def __init__(self, sys_argv):
+        set_app_user_model_id()
         self.app = QApplication(sys_argv)
         self.app.setQuitOnLastWindowClosed(False)
         apply_app_style(self.app)

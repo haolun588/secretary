@@ -8,7 +8,8 @@ secretary/
 ├── requirements-dev.txt          # 開發依賴（pytest，固定版本）
 ├── .gitignore
 ├── assets/                       # 圖示資源
-│   ├── icon.ico / icon.png       # 應用程式圖示
+│   ├── logo.svg                  # 品牌 logo 原稿（青綠漸層圓角方塊＋日曆＋時鐘，原色渲染，不重新上色）；側邊欄、get_app_icon 後備、icon.png / icon.ico 皆由它而來
+│   ├── icon.ico / icon.png       # 應用程式圖示（由 icon_generator 自 logo.svg 產生；ico 內含 16/24/32/48/64/128/256 七種尺寸）
 │   └── icons/*.svg               # UI 線條圖示（專案自繪，24 格、stroke currentColor；風格參考 Lucide（ISC 授權），非複製 Lucide 原始檔）
 ├── docs/
 │   ├── dev_rules.md              # 技術規範與設計指南（含 UI 規範、視覺預覽）
@@ -21,7 +22,7 @@ secretary/
 ├── main.py                       # 主程式入口：托盤、單一實例、喝水計時（WaterCountdown）、EventStore 建立與注入、toast 堆疊、套用全域樣式
 ├── scripts/                      # 開發/一次性工具腳本
 │   ├── create_shortcut.py        # 建立桌面捷徑與啟動 .bat
-│   ├── icon_generator.py         # 應用程式圖示產生器
+│   ├── icon_generator.py         # 應用程式圖示產生器：QSvgRenderer 渲染 assets/logo.svg，輸出 icon.png（256）與多尺寸 icon.ico（各尺寸獨立渲染，手寫 PNG 內嵌 ICO）
 │   └── render_preview.py         # offscreen 視覺預覽：假資料（FakeStore / FakeConfig）渲染各畫面成 PNG，不連網、不讀 data/
 ├── tests/                        # 自動化測試 (pytest；不連網、不開可見 GUI、不碰真實 data/)
 │   ├── conftest.py               # 專案根加入 sys.path、日誌導向暫存目錄、session 範圍單一 offscreen QApplication

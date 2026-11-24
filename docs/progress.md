@@ -110,3 +110,10 @@
 ## 📌 等級改存 extendedProperties (2026-11-25 完成；未 commit，未對真實 Google 實測)
 - [x] 等級改以 `extendedProperties.private.secretary_priority` 為主，`colorId` 為備援；衝突以 extendedProperties 為準，舊事件不主動補寫（`services/event_mapping.py`：`priority_from_item`、`extended_properties_for`；`to_google_body` 與 `build_patch_body` 同步寫入）
 - 待驗證：`events.patch` 對 `extendedProperties.private` 的 key 合併行為
+
+## 📌 Logo 改版 (2026-11-25 完成；未 commit，未實機驗證)
+- [x] 新增 `assets/logo.svg`（青綠漸層圓角方塊＋白色日曆＋時鐘）；`scripts/icon_generator.py` 改為由它渲染 `icon.png`（256）與 7 尺寸 `icon.ico`
+- [x] 側邊欄 logo 改以原色渲染（`icons.logo_pixmap`），移除舊 `assets/icons/logo.svg`（單色勾勾方框）；`get_app_icon()` 後備改用新 logo
+- [x] `main.py` 於 Windows 建立 QApplication 前設定 AppUserModelID `Secretary.DesktopAssistant`，避免工作列顯示 Python 圖示／群組
+- 測試狀態：`python -m pytest -q`：443 passed。
+- 未實機驗證：工作列／標題列／系統匣實際顯示；既有桌面捷徑需重新執行 `scripts/create_shortcut.py` 才會換圖示，Windows 圖示快取可能需重新整理（`ie4uinit.exe -show`）。
