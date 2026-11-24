@@ -13,6 +13,13 @@ from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 from PyQt6.QtGui import QIcon, QAction, QPixmap, QColor, QPainter
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
+from utils.paths import asset_path, ensure_data_dirs, migrate_legacy_files
+try:
+    ensure_data_dirs()
+    migrate_legacy_files()
+except Exception as _e:
+    print(f"[{datetime.now().isoformat()}] [main] 初始化 data/ 目錄或搬移舊檔失敗，繼續執行: {_e}")
+
 from utils.config_manager import ConfigManager
 from utils.autostart import AutoStartManager
 from ui.main_window import MainWindow
@@ -21,8 +28,7 @@ from ui.toast_window import ToastWindow
 SINGLE_INSTANCE_SOCKET = "SecretaryApp_SingleInstance_Lock_haolun588"
 
 def get_app_icon():
-    project_dir = os.path.dirname(os.path.abspath(__file__))
-    icon_path = os.path.join(project_dir, "assets", "icon.png")
+    icon_path = asset_path("icon.png")
     if os.path.exists(icon_path):
         return QIcon(icon_path)
 

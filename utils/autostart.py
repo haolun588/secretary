@@ -7,6 +7,7 @@ Windows 開機自動啟動登錄檔控制模組 (Auto-Start Registry Helper)
 import sys
 import os
 from datetime import datetime
+from utils.paths import PROJECT_DIR
 
 REG_KEY_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
 APP_NAME = "SecretaryAssistant"
@@ -15,7 +16,7 @@ class AutoStartManager:
     @staticmethod
     def get_executable_command():
         """取得開機啟動執行命令 (帶入 --minimized 靜默啟動參數)"""
-        main_script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "main.py")
+        main_script = os.path.join(PROJECT_DIR, "main.py")
         
         # 若為已編譯 exe 或通用 Python 環境
         if getattr(sys, 'frozen', False):

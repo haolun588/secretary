@@ -1,5 +1,5 @@
 """
-utils/arrow_generator.py
+scripts/arrow_generator.py
 生成 QSpinBox 大尺寸清晰箭頭圖示 (arrow_up.png & arrow_down.png)
 """
 

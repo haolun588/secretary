@@ -11,7 +11,7 @@
 - `docs/progress.md`：開發進度與已知問題
 
 ## 作業紅線
-- 不得讀取、印出、提交 `credentials.json`、`token.json`、`config.json`。
+- 不得讀取、印出、提交 `data/` 內的 `credentials.json`、`token.json`、`config.json`（整個 `data/` 不得讀取或提交）。
 - 未經使用者同意，不得啟動 GUI、不得呼叫 Google Calendar API（會改動使用者真實日曆）、不得寫入 Windows Registry（autostart）。
 - 不得寫死個人路徑（使用者名稱、磁碟代號、Python 安裝路徑）；路徑以專案目錄或 `sys.executable` 動態推導。
 - 網路呼叫（Google API、OAuth）不得在 Qt 主執行緒同步執行。

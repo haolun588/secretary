@@ -4,6 +4,7 @@ ui/calendar_dialog.py
 """
 
 import os
+from utils.paths import asset_path, qss_url
 from PyQt6.QtCore import Qt, QDate, QTime, QDateTime
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -22,8 +23,7 @@ class ConfirmDeleteDialog(QDialog):
         self.setWindowTitle("確認刪除行程")
         self.setFixedSize(420, 210)
 
-        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        icon_path = os.path.join(project_dir, "assets", "icon.png")
+        icon_path = asset_path("icon.png")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 
@@ -151,9 +151,8 @@ class DatePopupButton(QPushButton):
     def show_calendar_popup(self):
         popup = QDialog(self, Qt.WindowType.Popup)
 
-        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        up_img = os.path.join(project_dir, "assets", "arrow_up.png").replace("\\", "/")
-        down_img = os.path.join(project_dir, "assets", "arrow_down.png").replace("\\", "/")
+        up_img = qss_url(asset_path("arrow_up.png"))
+        down_img = qss_url(asset_path("arrow_down.png"))
 
         popup.setStyleSheet(f"""
             QDialog {{
@@ -210,7 +209,7 @@ class DatePopupButton(QPushButton):
                 background-color: #8b5cf6;
             }}
             QCalendarWidget QSpinBox::up-arrow {{
-                image: url('{up_img}');
+                image: url("{up_img}");
                 width: 12px;
                 height: 12px;
             }}
@@ -227,7 +226,7 @@ class DatePopupButton(QPushButton):
                 background-color: #8b5cf6;
             }}
             QCalendarWidget QSpinBox::down-arrow {{
-                image: url('{down_img}');
+                image: url("{down_img}");
                 width: 12px;
                 height: 12px;
             }}
@@ -286,8 +285,7 @@ class CalendarDialog(QDialog):
         self.setWindowTitle("新增 / 編輯行程")
         self.setFixedSize(500, 640)
 
-        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        icon_path = os.path.join(project_dir, "assets", "icon.png")
+        icon_path = asset_path("icon.png")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 

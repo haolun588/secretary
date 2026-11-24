@@ -1,5 +1,5 @@
 """
-utils/icon_generator.py
+scripts/icon_generator.py
 生成 Secretary 桌面小助理高畫質圖示檔 (PNG & ICO)
 """
 

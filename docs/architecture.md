@@ -12,10 +12,16 @@ secretary/
 │   ├── progress.md               # 任務進度清單與已知問題
 │   ├── architecture.md           # 本系統架構文件
 │   └── dev_logs/                 # 開工/收工日誌目錄 (YYYYMMDD_主題.md)
-├── config.json                   # 使用者設定檔 (已被 .gitignore 排除，不納入版控)
+├── data/                         # 執行期資料 (不進版控，整個資料夾被 .gitignore 排除)
+│   ├── config.json               # 使用者設定檔
+│   ├── credentials.json          # Google OAuth 憑證
+│   ├── token.json                # Google OAuth token
+│   └── logs/                     # 日誌目錄 (預留)
 ├── main.py                       # 主程式入口 (托盤圖示 QSystemTrayIcon、closeEvent 攔截與背景計時器)
-├── create_shortcut.py            # 建立桌面捷徑與啟動 .bat
-├── preview_ui.py                 # UI 預覽腳本 (注意：實際會連線 Google)
+├── scripts/                      # 開發/一次性工具腳本 (可直接 python scripts/xxx.py 執行)
+│   ├── create_shortcut.py        # 建立桌面捷徑與啟動 .bat
+│   ├── arrow_generator.py        # 箭頭圖示產生器
+│   └── icon_generator.py         # 應用程式圖示產生器
 ├── ui/
 │   ├── main_window.py            # 主視窗外框 (包含 closeEvent 重寫，點擊 ✕ 隱藏至托盤)
 │   ├── nav_sidebar.py            # 左側選單欄元件
@@ -27,9 +33,7 @@ secretary/
     ├── autostart.py              # 開機自啟動登錄檔控制模組 (支援 --minimized 靜默啟動)
     ├── config_manager.py         # 設定檔讀寫模組 (config.json 持久化)
     ├── google_calendar.py        # Google Calendar API 串接與 colorId 解析 (reminders.overrides 尚未實作)
-    ├── shortcut_creator.py       # 捷徑建立工具 (與 create_shortcut.py 重複)
-    ├── arrow_generator.py        # 箭頭圖示產生器 (目前未被引用)
-    └── icon_generator.py         # 應用程式圖示產生器 (目前未被引用)
+    └── paths.py                  # 集中路徑定義 (data/、assets/ 絕對路徑與舊檔搬遷)
 ```
 
 ## 2. 資料流與組件交互說明

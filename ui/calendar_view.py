@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QFont, QColor, QPalette, QTextCharFormat
 
 from ui.calendar_dialog import CalendarDialog
+from utils.paths import asset_path, qss_url
 from utils.google_calendar import GoogleCalendarService, GoogleFetchWorker
 
 class CalendarView(QWidget):
@@ -94,7 +95,7 @@ class CalendarView(QWidget):
                 background-color: #8b5cf6;
             }
             QCalendarWidget QSpinBox::up-arrow {
-                image: url(assets/arrow_up.png);
+                image: url("__ARROW_UP__");
                 width: 12px;
                 height: 12px;
             }
@@ -111,7 +112,7 @@ class CalendarView(QWidget):
                 background-color: #8b5cf6;
             }
             QCalendarWidget QSpinBox::down-arrow {
-                image: url(assets/arrow_down.png);
+                image: url("__ARROW_DOWN__");
                 width: 12px;
                 height: 12px;
             }
@@ -235,7 +236,8 @@ class CalendarView(QWidget):
             QScrollBar::handle:vertical:hover {
                 background: #8b5cf6;
             }
-        """)
+        """.replace("__ARROW_UP__", qss_url(asset_path("arrow_up.png")))
+           .replace("__ARROW_DOWN__", qss_url(asset_path("arrow_down.png"))))
         self.setObjectName("CalendarView")
 
         main_layout = QHBoxLayout(self)

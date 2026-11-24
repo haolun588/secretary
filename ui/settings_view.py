@@ -269,5 +269,5 @@ class SettingsView(QWidget):
             QMessageBox.warning(
                 self,
                 "Google 授權提示",
-                "尚未偵測到 credentials.json 憑證檔或網頁授權未完成。\n\n如需正式同步您的私人 Google 日曆：\n1. 請確認憑證檔命名為 credentials.json 並放置於專案根目錄下。\n2. 點擊按鈕授權時，請於彈出的瀏覽器視窗完成允許授權。"
+                "尚未偵測到 credentials.json 憑證檔或網頁授權未完成。\n\n如需正式同步您的私人 Google 日曆：\n1. 請確認憑證檔命名為 credentials.json 並放置於專案的 data 資料夾內（data/credentials.json）。\n2. 點擊按鈕授權時，請於彈出的瀏覽器視窗完成允許授權。"
             )

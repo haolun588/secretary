@@ -40,9 +40,9 @@
 7. 日誌使用 `print`，在 `pythonw` 下全部遺失。
 8. autostart 預設開啟，且每次啟動都寫入 Registry。
 9. 只抓 `timeMin=now`、`maxResults=100`，未處理 `nextPageToken`；過去日期一律空白。
-10. 箭頭圖示 QSS 使用相對路徑 `assets/...`，開機自啟時可能失效（`calendar_view.py`）。
+10. ~~箭頭圖示 QSS 使用相對路徑 `assets/...`~~（2026-11-24 工作區整理已修正：改用 `utils/paths.py` 絕對路徑）。
 11. 尚無自動化測試。
-12. 重複／未使用程式碼：`utils/shortcut_creator.py` 與 `create_shortcut.py` 重複、`utils/arrow_generator.py` 與 `utils/icon_generator.py` 未被引用、`preview_ui.py` 實際會連線 Google。
+12. ~~重複／未使用程式碼~~（2026-11-24 工作區整理已修正：刪除 `preview_ui.py`、`utils/shortcut_creator.py`，產生器與捷徑腳本移至 `scripts/`）。
 
 ## 📌 Phase 4: Google 日曆原生多階段提醒支援 (規劃中)
 - [ ] `utils/google_calendar.py`: 擴充 `add_event` / `update_event` 支援傳送 `reminders.overrides`（包含 10 分鐘、30 分鐘、1 小時、1 天等多階段提醒）

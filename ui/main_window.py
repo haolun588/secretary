@@ -9,6 +9,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QStackedWidget
 from PyQt6.QtGui import QIcon
 
+from utils.paths import asset_path
 from ui.nav_sidebar import NavSidebar
 from ui.calendar_view import CalendarView
 from ui.settings_view import SettingsView
@@ -27,8 +28,7 @@ class MainWindow(QMainWindow):
         self.setStyleSheet("QMainWindow { background-color: #121217; }")
 
         # 設定左上角與工作列圖示
-        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        icon_path = os.path.join(project_dir, "assets", "icon.png")
+        icon_path = asset_path("icon.png")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 

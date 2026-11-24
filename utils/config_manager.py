@@ -8,7 +8,7 @@ import os
 import json
 from datetime import datetime
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
+from utils.paths import CONFIG_PATH, DATA_DIR
 
 DEFAULT_CONFIG = {
     "interval_minutes": 10,
@@ -43,6 +43,7 @@ class ConfigManager:
             config.update(config_data)
             config["last_updated"] = datetime.now().isoformat()
 
+            os.makedirs(DATA_DIR, exist_ok=True)
             with open(CONFIG_PATH, "w", encoding="utf-8") as f:
                 json.dump(config, f, ensure_ascii=False, indent=4)
             return True

@@ -26,7 +26,7 @@
 - **UI & 框架**：採用 Python + PyQt6，以 `QStackedWidget` 結合左側側邊欄導覽按鈕 (`Navigation Bar`)，建構流暢無縫的分頁切換體驗。
 - **系統托盤與關閉事件**：使用 `QSystemTrayIcon`，實現右鍵選單 (顯示主視窗 / 測試喝水提醒 / 系統與提醒設定 / 退出程式)。
 - **開機自啟**：透過 Windows Registry (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) 寫入包含 `pythonw main.py --minimized` 之啟動命令。
-- **設定儲存**：採用 JSON 格式儲存使用者設定 (`config.json`)。
+- **設定儲存**：採用 JSON 格式儲存使用者設定 (`data/config.json`)。
 - **異常處理與日誌**：外部 API、檔案存取、登錄檔寫入須有 try-except，並使用 Python `logging` 寫入檔案（含時間戳，建議 `RotatingFileHandler`；日誌檔已被 `.gitignore` 的 `*.log` 排除）。因 `pythonw` 沒有 stdout，`print` 不能當作日誌。
 
 ## 3. 開發階段

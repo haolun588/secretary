@@ -7,6 +7,7 @@ import os
 import socket
 from datetime import datetime
 from PyQt6.QtCore import QThread, pyqtSignal
+from utils.paths import CREDENTIALS_PATH, TOKEN_PATH
 
 try:
     _orig_getaddrinfo = socket.getaddrinfo
@@ -39,8 +40,8 @@ class GoogleCalendarService:
     def __init__(self):
         self.service = None
         self.is_connected = False
-        self.credentials_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "credentials.json")
-        self.token_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "token.json")
+        self.credentials_file = CREDENTIALS_PATH
+        self.token_file = TOKEN_PATH
 
     def parse_priority_from_color(self, color_id, default="minor"):
         if not color_id:
