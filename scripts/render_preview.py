@@ -233,15 +233,29 @@ def build_components():
     return root
 
 
-def build_main_current():
+def _build_main_window():
     from ui.main_window import MainWindow
-    return MainWindow(FakeConfig(), FakeStore())
+    win = MainWindow(FakeConfig(), FakeStore())
+    win.sidebar.set_countdown(8 * 60 + 42)
+    return win
+
+
+def build_main_shell():
+    return _build_main_window()
+
+
+def build_main_water():
+    win = _build_main_window()
+    win.sidebar.btn_water.click()
+    return win
 
 
 # 名稱 -> (建構函式, 寬, 高)；尚未實作的畫面見 TODO_SCREENS
 SCREENS = {
     "components": (build_components, 900, 560),
-    "main_current": (build_main_current, theme.WINDOW_W, theme.WINDOW_H),
+    "main_shell_1180x740": (build_main_shell, theme.WINDOW_W, theme.WINDOW_H),
+    "main_shell_960x620": (build_main_shell, theme.WINDOW_MIN_W, theme.WINDOW_MIN_H),
+    "main_water": (build_main_water, theme.WINDOW_W, theme.WINDOW_H),
 }
 
 # TODO（後續批次補上）：

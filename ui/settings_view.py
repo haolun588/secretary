@@ -10,6 +10,9 @@ from PyQt6.QtWidgets import (
     QPushButton, QCheckBox, QFrame, QGroupBox, QMessageBox, QScrollArea
 )
 from ui.toast_window import ToastWindow
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 class SettingsView(QWidget):
     water_enabled_signal = pyqtSignal(bool)
@@ -102,6 +105,7 @@ class SettingsView(QWidget):
         self.setObjectName("SettingsView")
 
         scroll_area = QScrollArea(self)
+        self._scroll_area = scroll_area
         scroll_area.setWidgetResizable(True)
         scroll_area.setStyleSheet("border: none; background: transparent;")
 
@@ -130,6 +134,7 @@ class SettingsView(QWidget):
         # 1. 喝水提醒設定卡片
         # ----------------------------------------------------
         water_group = QGroupBox("💧 喝水定時提醒偏好", container_widget)
+        self._water_group = water_group
         w_layout = QVBoxLayout(water_group)
         w_layout.setContentsMargins(24, 20, 24, 20)
         w_layout.setSpacing(18)
@@ -278,6 +283,15 @@ class SettingsView(QWidget):
                 self._set_status("狀態：🟢 已成功連線 Google 日曆 (雲端同步運作中)", "#10b981")
             else:
                 self._show_unauthorized()
+
+    def scroll_to_water(self):
+        """捲動到喝水提醒區塊（供導覽列喝水按鈕使用）。"""
+        group = getattr(self, "_water_group", None)
+        scroll = getattr(self, "_scroll_area", None)
+        if group is None or scroll is None:
+            logger.debug("scroll_to_water: 設定頁尚未建立喝水區塊，略過")
+            return
+        scroll.ensureWidgetVisible(group, 0, 0)
 
     def on_water_enabled_toggled(self, checked):
         self.spin_interval.setEnabled(checked)

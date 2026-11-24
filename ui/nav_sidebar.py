@@ -1,164 +1,156 @@
 """
 ui/nav_sidebar.py
-左側主選單導覽欄 (Left Navigation Sidebar Container)
-包含動態倒數計時文字標籤 update_countdown(text)
+左側窄版圖示導覽列（寬 theme.NAV_WIDTH）：Logo、日曆、喝水、設定，底部為喝水倒數。
+樣式一律來自 ui/styles.py 的 _NAV 區段（QFrame#NavSidebar、QToolButton:checked、NavCountdown）。
 """
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
-from PyQt6.QtGui import QFont
+import re
+
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
+from PyQt6.QtWidgets import QButtonGroup, QFrame, QLabel, QToolButton, QVBoxLayout
+
+from ui import icons, theme
+from ui.styles import repolish
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+PAGE_CALENDAR = 0
+PAGE_SETTINGS = 1
+
+_COUNTDOWN_OFF_TEXT = "關"
+_COUNTDOWN_OFF_TIP = "喝水提醒已關閉"
+_COUNTDOWN_ON_TIP = "距離下次喝水提醒"
+_TIME_RE = re.compile(r"(\d+):(\d{2})(?::(\d{2}))?")
+
+
+def format_countdown(seconds):
+    """秒數 -> 'mm:ss'；滿 60 分鐘以上為 'h:mm:ss'；負數視為 0。"""
+    total = max(0, int(seconds))
+    hours, rest = divmod(total, 3600)
+    minutes, secs = divmod(rest, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes:02d}:{secs:02d}"
+
+
+def _parse_countdown_text(text):
+    """從舊格式文字（例如「下次提醒: 08:42 後」）抓出秒數；抓不到回傳 None。"""
+    match = _TIME_RE.search(text or "")
+    if not match:
+        return None
+    a, b, c = match.groups()
+    if c is None:
+        return int(a) * 60 + int(b)
+    return int(a) * 3600 + int(b) * 60 + int(c)
+
 
 class NavSidebar(QFrame):
     page_changed = pyqtSignal(int)
+    water_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.init_ui()
-
-    def init_ui(self):
-        self.setFixedWidth(230)
-        self.setStyleSheet("""
-            QFrame#NavSidebar {
-                background-color: #16161e;
-                border-right: 1px solid #23232e;
-            }
-            QPushButton.NavBtn {
-                background-color: transparent;
-                color: #a0a0ab;
-                font-size: 14px;
-                font-weight: 600;
-                font-family: 'Segoe UI', 'Microsoft JhengHei UI', sans-serif;
-                border: none;
-                border-radius: 12px;
-                padding: 12px 16px;
-                text-align: left;
-            }
-            QPushButton.NavBtn:hover {
-                background-color: #23232e;
-                color: #ffffff;
-            }
-            QPushButton.NavBtnActive {
-                background-color: #8b5cf6;
-                color: #ffffff;
-                font-size: 14px;
-                font-weight: 700;
-                font-family: 'Segoe UI', 'Microsoft JhengHei UI', sans-serif;
-                border: none;
-                border-radius: 12px;
-                padding: 12px 16px;
-                text-align: left;
-            }
-            QFrame#StatusCard {
-                background-color: #1c1c24;
-                border: 1px solid #2a2a36;
-                border-radius: 14px;
-            }
-        """)
         self.setObjectName("NavSidebar")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setFixedWidth(theme.NAV_WIDTH)
+        self._countdown_off = None  # 尚未設定；用來只在狀態改變時 repolish
+        self._parse_fail_logged = False
+        self._build()
+        self.set_countdown(None)
 
+    def _make_nav_button(self, icon_name, tooltip):
+        btn = QToolButton(self)
+        btn.setCheckable(True)
+        btn.setAutoRaise(True)
+        btn.setIconSize(QSize(theme.ICON_MD, theme.ICON_MD))
+        btn.setIcon(icons.icon(icon_name, theme.TEXT_SECONDARY, theme.ICON_MD, active_color=theme.ACCENT))
+        btn.setToolTip(tooltip)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        self._group.addButton(btn)
+        return btn
+
+    def _build(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 24, 16, 24)
-        layout.setSpacing(12)
+        layout.setContentsMargins(0, theme.SPACE_3, 0, theme.SPACE_3)
+        layout.setSpacing(theme.SPACE_2)
+        align = Qt.AlignmentFlag.AlignHCenter
 
-        # 頂部 Logo
-        logo_box = QHBoxLayout()
-        logo_box.setSpacing(10)
+        self.logo = QLabel(self)
+        self.logo.setObjectName("NavLogo")
+        logo_size = theme.ICON_MD + theme.SPACE_1
+        self.logo.setPixmap(icons.pixmap("logo", theme.ACCENT, logo_size))
+        self.logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.logo.setFixedHeight(theme.NAV_BTN)
+        layout.addWidget(self.logo, 0, align)
+        layout.addSpacing(theme.SPACE_2)
 
-        logo_icon = QLabel("⚡", self)
-        logo_icon.setFont(QFont("Segoe UI Emoji", 20))
-        logo_icon.setStyleSheet("""
-            background-color: #8b5cf6;
-            color: #ffffff;
-            border-radius: 10px;
-            padding: 4px;
-        """)
-        logo_icon.setFixedSize(36, 36)
-        logo_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._group = QButtonGroup(self)
+        self._group.setExclusive(True)
 
-        logo_text_box = QVBoxLayout()
-        logo_text_box.setSpacing(0)
-        
-        logo_title = QLabel("Secretary", self)
-        logo_title.setStyleSheet("color: #ffffff; font-size: 17px; font-weight: 800;")
-        
-        logo_sub = QLabel("智能桌面小助理", self)
-        logo_sub.setStyleSheet("color: #a0a0ab; font-size: 11px;")
+        self.btn_calendar = self._make_nav_button("calendar", "日曆與行程")
+        self.btn_water = self._make_nav_button("droplet", "喝水提醒")
+        self.btn_settings = self._make_nav_button("settings", "設定")
+        self.btn_calendar.setChecked(True)
 
-        logo_text_box.addWidget(logo_title)
-        logo_text_box.addWidget(logo_sub)
+        self.btn_calendar.clicked.connect(lambda: self.set_active_page(PAGE_CALENDAR))
+        self.btn_settings.clicked.connect(lambda: self.set_active_page(PAGE_SETTINGS))
+        self.btn_water.clicked.connect(self.water_requested.emit)
 
-        logo_box.addWidget(logo_icon)
-        logo_box.addLayout(logo_text_box)
-        logo_box.addStretch(1)
-
-        layout.addLayout(logo_box)
-        layout.addSpacing(16)
-
-        # 導覽按鈕群組
-        self.btn_calendar = QPushButton("📅  日曆與行程", self)
-        self.btn_calendar.setObjectName("btn_calendar")
-        self.btn_calendar.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_calendar.setProperty("active", True)
-        self.btn_calendar.setProperty("class", "NavBtnActive")
-        self.btn_calendar.clicked.connect(lambda: self.set_active_page(0))
-        layout.addWidget(self.btn_calendar)
-
-        self.btn_settings = QPushButton("⚙️  喝水與設定", self)
-        self.btn_settings.setObjectName("btn_settings")
-        self.btn_settings.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_settings.setProperty("class", "NavBtn")
-        self.btn_settings.clicked.connect(lambda: self.set_active_page(1))
-        layout.addWidget(self.btn_settings)
+        for btn in (self.btn_calendar, self.btn_water, self.btn_settings):
+            layout.addWidget(btn, 0, align)
 
         layout.addStretch(1)
 
-        # 底部狀態卡片 (即時實時倒數文字)
-        status_card = QFrame(self)
-        status_card.setObjectName("StatusCard")
-        sc_layout = QVBoxLayout(status_card)
-        sc_layout.setContentsMargins(12, 12, 12, 12)
-        sc_layout.setSpacing(8)
+        self.countdown_icon = QLabel(self)
+        self.countdown_icon.setPixmap(icons.pixmap("droplet", theme.TEXT_MUTED, theme.ICON_SM))
+        self.countdown_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.countdown_icon, 0, align)
 
-        status_top = QHBoxLayout()
-        self.status_dot = QLabel("●", status_card)
-        self.status_dot.setStyleSheet("color: #10b981; font-size: 14px;")
-        
-        self.status_title = QLabel("助理背景運作中", status_card)
-        self.status_title.setStyleSheet("color: #10b981; font-size: 12px; font-weight: 700;")
-        
-        status_top.addWidget(self.status_dot)
-        status_top.addWidget(self.status_title)
-        status_top.addStretch(1)
-
-        self.status_lbl = QLabel("下次提醒: 10:00 後", status_card)
-        self.status_lbl.setStyleSheet("color: #a0a0ab; font-size: 11.5px;")
-
-        sc_layout.addLayout(status_top)
-        sc_layout.addWidget(self.status_lbl)
-
-        layout.addWidget(status_card)
+        self.countdown_label = QLabel(self)
+        self.countdown_label.setObjectName("NavCountdown")
+        self.countdown_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.countdown_label)
 
     def set_active_page(self, page_index):
-        if page_index == 0:
-            self.btn_calendar.setProperty("class", "NavBtnActive")
-            self.btn_settings.setProperty("class", "NavBtn")
+        """切換頁面：更新按鈕選取態並發出 page_changed；只接受 PAGE_CALENDAR / PAGE_SETTINGS。"""
+        if page_index == PAGE_CALENDAR:
+            btn = self.btn_calendar
+        elif page_index == PAGE_SETTINGS:
+            btn = self.btn_settings
         else:
-            self.btn_calendar.setProperty("class", "NavBtn")
-            self.btn_settings.setProperty("class", "NavBtnActive")
-
-        self.btn_calendar.setStyle(self.btn_calendar.style())
-        self.btn_settings.setStyle(self.btn_settings.style())
-
+            logger.warning(f"set_active_page 收到無效頁面索引: {page_index!r}，已忽略")
+            return
+        btn.setChecked(True)
         self.page_changed.emit(page_index)
 
-    def update_countdown(self, text, is_enabled=True):
-        """實時更新左下角倒數計時文字與狀態點"""
-        self.status_lbl.setText(text)
-        if is_enabled:
-            self.status_dot.setStyleSheet("color: #10b981; font-size: 14px;")
-            self.status_title.setText("助理背景運作中")
-            self.status_title.setStyleSheet("color: #10b981; font-size: 12px; font-weight: 700;")
+    def set_countdown(self, seconds):
+        """顯示喝水倒數；seconds 為 None 表示提醒已關閉。只有開/關狀態改變時才 repolish 與更新 tooltip。"""
+        off = seconds is None
+        if off:
+            self.countdown_label.setText(_COUNTDOWN_OFF_TEXT)
         else:
-            self.status_dot.setStyleSheet("color: #f43f5e; font-size: 14px;")
-            self.status_title.setText("喝水提醒已關閉")
-            self.status_title.setStyleSheet("color: #f43f5e; font-size: 12px; font-weight: 700;")
+            self.countdown_label.setText(format_countdown(seconds))
+        if off == self._countdown_off:
+            return
+        self._countdown_off = off
+        self.countdown_label.setProperty("off", "true" if off else "false")
+        tip = _COUNTDOWN_OFF_TIP if off else _COUNTDOWN_ON_TIP
+        self.countdown_label.setToolTip(tip)
+        self.countdown_icon.setToolTip(tip)
+        repolish(self.countdown_label)
+
+    def update_countdown(self, text, is_enabled=True):
+        """相容舊介面：text 為「下次提醒: mm:ss 後」之類的文字。
+        is_enabled=False 顯示關閉態；解析失敗時維持上一次顯示。"""
+        if not is_enabled:
+            self.set_countdown(None)
+            return
+        seconds = _parse_countdown_text(text)
+        if seconds is None:
+            if not self._parse_fail_logged:
+                self._parse_fail_logged = True
+                logger.debug(f"update_countdown 無法解析倒數文字: {text!r}")
+            return
+        self.set_countdown(seconds)
