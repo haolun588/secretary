@@ -238,6 +238,7 @@ def _build_main_window():
     from ui.main_window import MainWindow
     win = MainWindow(FakeConfig(), FakeStore())
     win.sidebar.set_countdown(8 * 60 + 42)
+    win.water_view.set_countdown(8 * 60 + 42)
     return win
 
 
@@ -275,6 +276,9 @@ def build_main_shell():
 
 def build_main_water():
     win = _build_main_window()
+    cfg = FakeConfig().load_config()
+    win.water_view.chk_water_enabled.setChecked(cfg["water_enabled"])
+    win.water_view.spin_interval.setValue(cfg["interval_minutes"])
     win.sidebar.btn_water.click()
     return win
 
@@ -288,8 +292,6 @@ def _build_settings(authenticated):
     win.sidebar.set_active_page(PAGE_SETTINGS)
     cfg = FakeConfig().load_config()
     view = win.settings_view
-    view.chk_water_enabled.setChecked(cfg["water_enabled"])
-    view.spin_interval.setValue(cfg["interval_minutes"])
     view.chk_autostart.setChecked(cfg["autostart"])
     view.chk_minimize_to_tray.setChecked(cfg["minimize_to_tray"])
     store.auth_state_changed.emit(authenticated)

@@ -46,7 +46,8 @@ secretary/
 │   ├── side_panel.py             # 右側 300px 面板：即將到來、選取日清單、等級圖例
 │   ├── calendar_dialog.py        # 行程新增/編輯對話框（2 欄排版、等級色點、全天開關、DatePopupButton）；提醒時間選單尚未實作
 │   ├── confirm_dialog.py         # 共用確認對話框 ConfirmDialog（刪除、登出）
-│   ├── settings_view.py          # 設定頁：段落式清單（喝水提醒、一般、Google 日曆），scroll_to_water()
+│   ├── settings_view.py          # 設定頁：段落式清單（一般、Google 日曆）；喝水提醒已移至 water_view.py
+│   ├── water_view.py             # 喝水提醒頁：大字倒數（set_countdown，None 顯示「已停用」）＋啟用開關、提醒間隔、測試按鈕
 │   ├── toast_window.py           # ToastWindow（info/water/danger、按鈕、關閉鈕、hover 暫停）與 ToastStack（多則堆疊與重排）
 │   └── tray_menu.py              # 托盤右鍵選單建構（圖示、無 emoji）
 └── utils/
@@ -61,9 +62,9 @@ secretary/
 ## 2. 資料流與組件交互說明
 1. **開機靜默啟動與托盤化**：系統開機啟動時 `main.py` 接收 `--minimized`，不呼叫 `window.show()`，直接隱藏於 `QSystemTrayIcon`。
 2. **視窗關閉攔截 (`closeEvent`)**：`MainWindow.closeEvent` 依 config 的 `minimize_to_tray`（設定頁可切換）決定隱藏至托盤或結束。
-3. **托盤右鍵選單**：`ui/tray_menu.py` 建構，含圖示的「顯示主視窗」「測試喝水提醒」「系統與提醒設定」「退出程式」，樣式由全域 QSS 的 QMenu 分段套用。
+3. **托盤右鍵選單**：`ui/tray_menu.py` 建構，含圖示的「顯示主視窗」「測試喝水提醒」「設定」「退出程式」，樣式由全域 QSS 的 QMenu 分段套用。
 4. **Google 日曆與色彩標籤等級**：`services/event_mapping.py` 以 `extendedProperties.private.secretary_priority` 為主判斷等級，缺少或不合法時以 `colorId` 備援（11、4 大 30 天 / 5、6 中 7 天 / 2、10 小 3 天；未對應視為小事件），顯示為色條與圓點。
-5. **喝水提醒**：`main.py` 每秒 tick `utils/water_timer.WaterCountdown`，到時以 `ToastStack` 顯示 water 樣式 toast（按鈕「延後 10 分鐘」「已喝」）；導覽列底部以 `set_countdown` 顯示剩餘時間。設定頁的測試按鈕只發 `test_toast_requested`，由 `main.py` 顯示 toast，確保仍走堆疊。
+5. **喝水提醒**：`main.py` 每秒 tick `utils/water_timer.WaterCountdown`，到時以 `ToastStack` 顯示 water 樣式 toast（按鈕「延後 10 分鐘」「已喝」）；導覽列底部與喝水頁大字皆以 `set_countdown` 顯示剩餘時間（停用時餵 `None`）。喝水頁的測試按鈕只發 `test_toast_requested`，由 `main.py` 顯示 toast，確保仍走堆疊。
 6. **Google 日曆原生多階段提醒 (reminders.overrides)**（Phase 4 規劃中，尚未實作）：透過 `services/event_mapping.py` 傳遞與讀取 API 原生 `reminders`。
 
 ### 2.1 設計系統（階段 C）
@@ -73,7 +74,7 @@ secretary/
 - 深色標題列：`utils/win_titlebar.py` 只呼叫 DWM 視窗屬性（不碰 Registry），主視窗與對話框 showEvent 時啟用。
 
 ### 2.2 日曆頁結構與設計取捨
-- **導覽**：`NavSidebar` 為 52px 圖示列。喝水按鈕切到設定頁並捲到喝水區塊，不另設頁面：喝水只有開關、間隔、測試三個控制，獨立頁太空且與設定重複；導覽列仍提供一鍵直達。
+- **導覽**：`NavSidebar` 為 52px 圖示列。頁面順序為 日曆(0)／喝水(1)／設定(2)，與側欄按鈕順序一致（`PAGE_CALENDAR`／`PAGE_WATER`／`PAGE_SETTINGS`），三顆按鈕都走 `set_active_page`。喝水為獨立頁面（`WaterView`）：頂部大字倒數，下方沿用設定頁的卡片列放開關、間隔、測試；`main.py` 每秒同時餵導覽列與喝水頁。
 - **自繪而非現成元件**：月視圖、時間軸以 QPainter 自繪，不用 `QCalendarWidget` 或 `QTableView`+delegate。理由：格內色條 chip、「+N」、今天淡底需精細控制；命中測試是純幾何，可直接單元測試；時間軸的重疊並排分欄與現在時間線，標準元件無法表達。（`DatePopupButton` 彈出的小月曆仍是 `QCalendarWidget`，僅供挑日期。）
 - **純邏輯分離**：`calendar_logic.py` 不依賴 Qt widgets，涵蓋月格 42 格、週日期、`parse_event_dates`、`upcoming`、`timed_layout` 等，有完整單元測試。
 - **右側面板**：「即將到來」規則為明天以後依等級 30/7/3 天內、含進行中行程、排除已結束的定時行程、今天開始的只出現在選取日清單；另有選取日清單與等級圖例。

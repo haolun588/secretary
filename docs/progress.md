@@ -111,6 +111,11 @@
 - [x] 等級改以 `extendedProperties.private.secretary_priority` 為主，`colorId` 為備援；衝突以 extendedProperties 為準，舊事件不主動補寫（`services/event_mapping.py`：`priority_from_item`、`extended_properties_for`；`to_google_body` 與 `build_patch_body` 同步寫入）
 - 待驗證：`events.patch` 對 `extendedProperties.private` 的 key 合併行為
 
+## 📌 日期連動與喝水頁 (2026-11-25 完成；未 commit，未實機驗證)
+- [x] 喝水改為獨立頁面 `ui/water_view.py`（大字倒數＋啟用/間隔/測試）；導覽頁面常數改為 `PAGE_CALENDAR=0`／`PAGE_WATER=1`／`PAGE_SETTINGS=2`，移除 `water_requested`、`on_water_requested`、設定頁喝水區塊與 `scroll_to_water`；`main.py` 改綁 `water_view` 並每秒餵倒數；新增 `theme.FONT_DISPLAY`
+- 測試狀態：`python -m pytest -q`：439 passed。
+- 未實機驗證：對話框連動與紅框在實機的觀感、喝水頁實際畫面、托盤「系統與提醒設定」仍跳到設定頁（程式路徑未變）。
+
 ## 📌 Logo 改版 (2026-11-25 完成；未 commit，未實機驗證)
 - [x] 新增 `assets/logo.svg`（青綠漸層圓角方塊＋白色日曆＋時鐘）；`scripts/icon_generator.py` 改為由它渲染 `icon.png`（256）與 7 尺寸 `icon.ico`
 - [x] 側邊欄 logo 改以原色渲染（`icons.logo_pixmap`），移除舊 `assets/icons/logo.svg`（單色勾勾方框）；`get_app_icon()` 後備改用新 logo

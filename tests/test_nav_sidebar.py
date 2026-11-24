@@ -6,7 +6,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PyQt6.QtWidgets")
 
 from ui import theme  # noqa: E402
-from ui.nav_sidebar import NavSidebar, format_countdown  # noqa: E402
+from ui.nav_sidebar import (  # noqa: E402
+    PAGE_CALENDAR, PAGE_SETTINGS, PAGE_WATER, NavSidebar, format_countdown,
+)
 
 
 class FakeConfig:
@@ -68,24 +70,22 @@ def test_initial_state_calendar_checked(sidebar):
 
 
 def test_click_buttons_emit_signals_and_checked_exclusive(sidebar):
-    pages, waters = [], []
+    pages = []
     sidebar.page_changed.connect(pages.append)
-    sidebar.water_requested.connect(lambda: waters.append(True))
 
     sidebar.btn_settings.click()
-    assert pages == [1]
+    assert pages == [PAGE_SETTINGS]
     assert sidebar.btn_settings.isChecked()
     assert not sidebar.btn_calendar.isChecked()
 
     sidebar.btn_water.click()
-    assert waters == [True]
-    assert pages == [1]  # 喝水按鈕不發 page_changed，由 MainWindow 處理
+    assert pages == [PAGE_SETTINGS, PAGE_WATER]
     assert sidebar.btn_water.isChecked()
     assert not sidebar.btn_settings.isChecked()
     assert not sidebar.btn_calendar.isChecked()
 
     sidebar.btn_calendar.click()
-    assert pages == [1, 0]
+    assert pages == [PAGE_SETTINGS, PAGE_WATER, PAGE_CALENDAR]
     checked = [b.isChecked() for b in (sidebar.btn_calendar, sidebar.btn_water, sidebar.btn_settings)]
     assert checked == [True, False, False]
 
@@ -93,11 +93,18 @@ def test_click_buttons_emit_signals_and_checked_exclusive(sidebar):
 def test_set_active_page(sidebar):
     pages = []
     sidebar.page_changed.connect(pages.append)
-    sidebar.set_active_page(1)
+    sidebar.set_active_page(PAGE_SETTINGS)
     assert sidebar.btn_settings.isChecked()
-    sidebar.set_active_page(0)
+    sidebar.set_active_page(PAGE_CALENDAR)
     assert sidebar.btn_calendar.isChecked()
-    assert pages == [1, 0]
+    sidebar.set_active_page(PAGE_WATER)
+    assert sidebar.btn_water.isChecked()
+    assert pages == [PAGE_SETTINGS, PAGE_CALENDAR, PAGE_WATER]
+
+
+def test_page_constants_follow_button_order():
+    assert (PAGE_CALENDAR, PAGE_WATER, PAGE_SETTINGS) == (0, 1, 2)
+    assert not hasattr(NavSidebar, "water_requested")
 
 
 def test_set_countdown_none_shows_off_state(sidebar):
@@ -148,7 +155,7 @@ def test_set_active_page_when_water_checked(sidebar):
     sidebar.set_active_page(0)
     assert [b.isChecked() for b in (sidebar.btn_calendar, sidebar.btn_water, sidebar.btn_settings)] == [True, False, False]
     sidebar.btn_water.click()
-    sidebar.set_active_page(1)
+    sidebar.set_active_page(PAGE_SETTINGS)
     assert [b.isChecked() for b in (sidebar.btn_calendar, sidebar.btn_water, sidebar.btn_settings)] == [False, False, True]
 
 
@@ -172,31 +179,23 @@ def test_main_window_sizes_use_tokens(window):
 
 
 def test_main_window_public_attributes(window):
-    assert window.stacked_widget.count() == 2
-    assert window.stacked_widget.widget(0) is window.calendar_view
-    assert window.stacked_widget.widget(1) is window.settings_view
+    assert window.stacked_widget.count() == 3
+    assert window.stacked_widget.widget(PAGE_CALENDAR) is window.calendar_view
+    assert window.stacked_widget.widget(PAGE_WATER) is window.water_view
+    assert window.stacked_widget.widget(PAGE_SETTINGS) is window.settings_view
     assert window.stacked_widget.currentIndex() == 0
+    assert not hasattr(window, "on_water_requested")
 
 
-def test_main_window_settings_button_switches_page(window):
+def test_main_window_buttons_switch_pages(window):
     window.sidebar.btn_settings.click()
-    assert window.stacked_widget.currentIndex() == 1
-    window.sidebar.btn_calendar.click()
-    assert window.stacked_widget.currentIndex() == 0
-
-
-def test_main_window_water_button_goes_to_settings_and_scrolls(window):
-    calls = []
-    window.settings_view.scroll_to_water = lambda: calls.append(True)
+    assert window.stacked_widget.currentWidget() is window.settings_view
     window.sidebar.btn_water.click()
-    assert window.stacked_widget.currentIndex() == 1
-    assert calls == [True]
+    assert window.stacked_widget.currentWidget() is window.water_view
     assert window.sidebar.btn_water.isChecked()
     assert not window.sidebar.btn_settings.isChecked()
-
-
-def test_settings_view_scroll_to_water_does_not_raise(window):
-    window.settings_view.scroll_to_water()
+    window.sidebar.btn_calendar.click()
+    assert window.stacked_widget.currentWidget() is window.calendar_view
 
 
 def test_close_event_respects_minimize_to_tray(_session_qapplication, tmp_path):

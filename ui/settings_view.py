@@ -1,12 +1,12 @@
 """
 ui/settings_view.py
-設定頁（段落式清單）：喝水提醒、一般、Google 日曆。
+設定頁（段落式清單）：一般、Google 日曆（喝水提醒已獨立為 ui/water_view.py）。
 所有設定皆即時生效並由 main.py 即時儲存，沒有「儲存」按鈕。樣式由全域 QSS（_SETTINGS）負責。
 """
 
 from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QCheckBox, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton, QScrollArea, QSpinBox,
+    QCheckBox, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton, QScrollArea,
     QVBoxLayout, QWidget,
 )
 
@@ -16,8 +16,6 @@ from ui.styles import repolish
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
-
-WATER_INTERVAL_RANGE = (1, 180)
 
 
 class SettingsRow(QFrame):
@@ -52,7 +50,7 @@ class SettingsRow(QFrame):
             layout.addWidget(control, 0, Qt.AlignmentFlag.AlignVCenter)
 
 
-def _make_switch(parent):
+def make_switch(parent):
     chk = QCheckBox(parent)
     chk.setProperty("variant", "switch")
     chk.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -60,10 +58,8 @@ def _make_switch(parent):
 
 
 class SettingsView(QWidget):
-    water_enabled_signal = pyqtSignal(bool)
     autostart_signal = pyqtSignal(bool)
     minimize_to_tray_signal = pyqtSignal(bool)
-    test_toast_requested = pyqtSignal()
 
     def __init__(self, event_store, parent=None):
         super().__init__(parent)
@@ -122,34 +118,12 @@ class SettingsView(QWidget):
         title.setProperty("role", "title")
         layout.addWidget(title)
 
-        # ---- 喝水提醒 ----
-        self.chk_water_enabled = _make_switch(self._container)
-        self.chk_water_enabled.setChecked(True)
-        self.chk_water_enabled.toggled.connect(self.on_water_enabled_toggled)
-
-        self.spin_interval = QSpinBox(self._container)
-        self.spin_interval.setRange(*WATER_INTERVAL_RANGE)
-        self.spin_interval.setValue(10)
-        self.spin_interval.setSuffix(" 分鐘")
-        self.spin_interval.setMinimumWidth(theme.SETTINGS_CONTROL_W)
-
-        self.test_btn = QPushButton("測試", self._container)
-        self.test_btn.setProperty("variant", "secondary")
-        self.test_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.test_btn.clicked.connect(self.on_test_toast)
-
-        self._water_group, self._water_section = self._add_section(layout, "喝水提醒", [
-            SettingsRow("啟用喝水提醒", "定時在螢幕右下角跳出提醒", self.chk_water_enabled),
-            SettingsRow("提醒間隔", "每隔多久提醒一次", self.spin_interval),
-            SettingsRow("測試提醒", "立即跳出一則提醒，確認外觀與音效", self.test_btn),
-        ])
-
         # ---- 一般 ----
-        self.chk_autostart = _make_switch(self._container)
+        self.chk_autostart = make_switch(self._container)
         self.chk_autostart.setChecked(False)
         self.chk_autostart.toggled.connect(self.on_autostart_toggled)
 
-        self.chk_minimize_to_tray = _make_switch(self._container)
+        self.chk_minimize_to_tray = make_switch(self._container)
         self.chk_minimize_to_tray.setChecked(True)
         self.chk_minimize_to_tray.toggled.connect(self.on_minimize_to_tray_toggled)
 
@@ -296,25 +270,8 @@ class SettingsView(QWidget):
 
     # ------------------------------------------------------------ 其他設定
 
-    def scroll_to_water(self):
-        """捲動到喝水提醒區塊（供導覽列喝水按鈕使用）。"""
-        scroll = getattr(self, "_scroll_area", None)
-        section = getattr(self, "_water_section", None)
-        if section is None or scroll is None:
-            logger.debug("scroll_to_water: 設定頁尚未建立喝水區塊，略過")
-            return
-        scroll.ensureWidgetVisible(section, 0, 0)
-
-    def on_water_enabled_toggled(self, checked):
-        self.spin_interval.setEnabled(checked)
-        self.water_enabled_signal.emit(checked)
-
     def on_autostart_toggled(self, checked):
         self.autostart_signal.emit(checked)
 
     def on_minimize_to_tray_toggled(self, checked):
         self.minimize_to_tray_signal.emit(checked)
-
-    def on_test_toast(self):
-        """測試提醒由 main.py 負責顯示（與實際喝水提醒相同），這裡只發出請求。"""
-        self.test_toast_requested.emit()

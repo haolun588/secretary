@@ -94,10 +94,10 @@ class SecretaryApp:
         self.window = MainWindow(config_manager=ConfigManager, event_store=self.event_store)
 
         # 設定頁面初始化狀態
-        self.window.settings_view.chk_water_enabled.setChecked(self.water_enabled)
+        self.window.water_view.chk_water_enabled.setChecked(self.water_enabled)
         self.window.settings_view.chk_autostart.setChecked(self.autostart_enabled)
         self.window.settings_view.chk_minimize_to_tray.setChecked(self.minimize_to_tray)
-        self.window.settings_view.spin_interval.setValue(self.interval_minutes)
+        self.window.water_view.spin_interval.setValue(self.interval_minutes)
 
         # 實時 1 秒背景倒數計時器
         self.second_timer = QTimer()
@@ -108,11 +108,11 @@ class SecretaryApp:
         self.init_single_instance_server()
 
         # 連接設定訊號
-        self.window.settings_view.water_enabled_signal.connect(self.on_water_enabled_toggled)
+        self.window.water_view.water_enabled_signal.connect(self.on_water_enabled_toggled)
         self.window.settings_view.autostart_signal.connect(self.on_autostart_toggled)
         self.window.settings_view.minimize_to_tray_signal.connect(self.on_minimize_to_tray_toggled)
-        self.window.settings_view.test_toast_requested.connect(self.trigger_water_toast)
-        self.window.settings_view.spin_interval.valueChanged.connect(self.on_interval_changed)
+        self.window.water_view.test_toast_requested.connect(self.trigger_water_toast)
+        self.window.water_view.spin_interval.valueChanged.connect(self.on_interval_changed)
 
     def init_single_instance_server(self):
         """啟動 QLocalServer 監聽重複啟動的喚醒訊號"""
@@ -156,12 +156,14 @@ class SecretaryApp:
         """每秒觸發倒數計時與左側導覽列倒數更新"""
         if not self.water.enabled:
             self.window.sidebar.set_countdown(None)
+            self.window.water_view.set_countdown(None)
             return
 
         if self.water.tick():
             self.trigger_water_toast()
 
         self.window.sidebar.set_countdown(self.water.remaining)
+        self.window.water_view.set_countdown(self.water.remaining)
 
     def show_toast(self, **kwargs):
         """建立並顯示 toast；多個同時存在時由 ToastStack 往上堆疊。"""

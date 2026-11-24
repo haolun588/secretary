@@ -8,7 +8,7 @@
   - 點擊主視窗右上角「✕ (關閉)」按鈕時，攔截 `closeEvent`，**隱藏視窗至系統托盤 (System Tray) 並持續於背景運行**，不直接結束程式。退出程式僅能透過托盤右鍵選單點擊「退出程式」。
 - **開機自動靜默啟動 (Silent Boot Auto-Start)**：
   - Windows 開機自動啟動時代入 `--minimized` 參數，**直接隱藏於背景系統托盤**，不主動跳出主視窗干擾使用者。
-- **左側圖示導覽列 (Icon Navigation)**：52px 圖示列（日曆／喝水／設定）；喝水按鈕切到設定頁並捲到喝水區塊。
+- **左側圖示導覽列 (Icon Navigation)**：52px 圖示列（日曆／喝水／設定），三者皆為獨立頁面。
 - **定時喝水提醒**：每 N 分鐘（預設 10 分鐘，可透過 UI 調整）於螢幕右下角彈出 toast，提供「延後 10 分鐘」「已喝」按鈕；有按鈕時顯示至少 8 秒，hover 時暫停倒數，之後淡出 (Fade-out)；多則 toast 由 `ToastStack` 堆疊。
 - **Google 日曆整合與色彩標籤等級對應**：
   - 主介面整合日曆，支援串接 Google Calendar API。
@@ -25,7 +25,7 @@
 ## 2. 技術選型與約束 (Tech Stack & Constraints)
 - **作業系統目標**：Windows 10 / 11
 - **UI & 框架**：採用 Python + PyQt6，以 `QStackedWidget` 結合左側圖示導覽列 (`NavSidebar`) 切換分頁。
-- **系統托盤與關閉事件**：使用 `QSystemTrayIcon`，實現右鍵選單 (顯示主視窗 / 測試喝水提醒 / 系統與提醒設定 / 退出程式)。
+- **系統托盤與關閉事件**：使用 `QSystemTrayIcon`，實現右鍵選單 (顯示主視窗 / 測試喝水提醒 / 設定 / 退出程式)。
 - **開機自啟**：透過 Windows Registry (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) 寫入包含 `pythonw main.py --minimized` 之啟動命令。
 - **設定儲存**：採用 JSON 格式儲存使用者設定 (`data/config.json`)。
 - **異常處理與日誌**：外部 API、檔案存取、登錄檔寫入須有 try-except，並使用 Python `logging` 寫入檔案（`utils/logger.py`，含時間戳，`RotatingFileHandler`；日誌檔位於被 `.gitignore` 排除的 `data/logs/`）。因 `pythonw` 沒有 stdout，`print` 不能當作日誌。

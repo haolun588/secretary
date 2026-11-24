@@ -44,17 +44,6 @@ def view(_session_qapplication, store):
     _session_qapplication.setStyleSheet("")
 
 
-def test_water_signal_and_interval_enabled(view):
-    got = []
-    view.water_enabled_signal.connect(got.append)
-    view.chk_water_enabled.setChecked(False)
-    assert got == [False]
-    assert not view.spin_interval.isEnabled()
-    view.chk_water_enabled.setChecked(True)
-    assert got == [False, True]
-    assert view.spin_interval.isEnabled()
-
-
 def test_autostart_signal(view):
     got = []
     view.autostart_signal.connect(got.append)
@@ -72,13 +61,8 @@ def test_minimize_to_tray_signal(view):
     assert got == [False, True]
 
 
-def test_interval_range_and_suffix(view):
-    assert (view.spin_interval.minimum(), view.spin_interval.maximum()) == (1, 180)
-    assert view.spin_interval.suffix() == " 分鐘"
-
-
 def test_switch_variants(view):
-    for chk in (view.chk_water_enabled, view.chk_autostart, view.chk_minimize_to_tray):
+    for chk in (view.chk_autostart, view.chk_minimize_to_tray):
         assert chk.property("variant") == "switch"
 
 
@@ -152,11 +136,7 @@ def test_auth_success_message_box(view, store, monkeypatch):
     assert len(shown) == 1
 
 
-def test_test_button_emits_signal(view):
-    got = []
-    view.test_toast_requested.connect(lambda: got.append(True))
-    view.test_btn.click()
-    assert got == [True]
+def test_settings_does_not_show_toast_itself():
     assert not hasattr(sv, "ToastWindow")
 
 
@@ -178,6 +158,7 @@ def test_login_click_clears_auth_failed_flag(view, store):
     assert view.g_status_lbl.text() == "未連線"
 
 
-def test_scroll_to_water_does_not_raise(view):
-    view.resize(800, 300)
-    view.scroll_to_water()
+def test_water_controls_removed_from_settings(view):
+    for name in ("chk_water_enabled", "spin_interval", "test_btn", "scroll_to_water",
+                 "water_enabled_signal", "test_toast_requested"):
+        assert not hasattr(view, name), name

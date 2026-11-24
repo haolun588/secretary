@@ -1,6 +1,6 @@
 """
 ui/main_window.py
-主視窗外框容器：左側窄版導覽列 + 右側頁面堆疊（0=日曆、1=設定）。
+主視窗外框容器：左側窄版導覽列 + 右側頁面堆疊（0=日曆、1=喝水、2=設定）。
 樣式由全域 QSS（ui/styles.py）負責；此檔只處理版面與頁面切換。
 """
 
@@ -11,8 +11,9 @@ from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QWidget
 
 from ui import theme
 from ui.calendar_view import CalendarView
-from ui.nav_sidebar import PAGE_SETTINGS, NavSidebar
+from ui.nav_sidebar import NavSidebar
 from ui.settings_view import SettingsView
+from ui.water_view import WaterView
 from utils.logger import get_logger
 from utils.paths import asset_path
 from utils.win_titlebar import enable_dark_titlebar
@@ -49,27 +50,23 @@ class MainWindow(QMainWindow):
         # 左側導覽列（固定寬度）
         self.sidebar = NavSidebar(self)
         self.sidebar.page_changed.connect(self.on_page_changed)
-        self.sidebar.water_requested.connect(self.on_water_requested)
         main_layout.addWidget(self.sidebar)
 
         # 右側多頁面堆疊視窗 (QStackedWidget)，可伸縮
         self.stacked_widget = QStackedWidget(self)
 
         self.calendar_view = CalendarView(self.event_store, self)
+        self.water_view = WaterView(self)
         self.settings_view = SettingsView(self.event_store, self)
 
         self.stacked_widget.addWidget(self.calendar_view)  # Index 0: 日曆
-        self.stacked_widget.addWidget(self.settings_view)  # Index 1: 設定（含喝水）
+        self.stacked_widget.addWidget(self.water_view)  # Index 1: 喝水
+        self.stacked_widget.addWidget(self.settings_view)  # Index 2: 設定
 
         main_layout.addWidget(self.stacked_widget, stretch=1)
 
     def on_page_changed(self, index):
         self.stacked_widget.setCurrentIndex(index)
-
-    def on_water_requested(self):
-        """喝水按鈕：切到設定頁並捲到喝水區塊。"""
-        self.stacked_widget.setCurrentIndex(PAGE_SETTINGS)
-        self.settings_view.scroll_to_water()
 
     def showEvent(self, event):
         super().showEvent(event)

@@ -16,7 +16,8 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 PAGE_CALENDAR = 0
-PAGE_SETTINGS = 1
+PAGE_WATER = 1
+PAGE_SETTINGS = 2
 
 _COUNTDOWN_OFF_TEXT = "關"
 _COUNTDOWN_OFF_TIP = "喝水提醒已關閉"
@@ -47,7 +48,6 @@ def _parse_countdown_text(text):
 
 class NavSidebar(QFrame):
     page_changed = pyqtSignal(int)
-    water_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -95,8 +95,8 @@ class NavSidebar(QFrame):
         self.btn_calendar.setChecked(True)
 
         self.btn_calendar.clicked.connect(lambda: self.set_active_page(PAGE_CALENDAR))
+        self.btn_water.clicked.connect(lambda: self.set_active_page(PAGE_WATER))
         self.btn_settings.clicked.connect(lambda: self.set_active_page(PAGE_SETTINGS))
-        self.btn_water.clicked.connect(self.water_requested.emit)
 
         for btn in (self.btn_calendar, self.btn_water, self.btn_settings):
             layout.addWidget(btn, 0, align)
@@ -114,9 +114,11 @@ class NavSidebar(QFrame):
         layout.addWidget(self.countdown_label)
 
     def set_active_page(self, page_index):
-        """切換頁面：更新按鈕選取態並發出 page_changed；只接受 PAGE_CALENDAR / PAGE_SETTINGS。"""
+        """切換頁面：更新按鈕選取態並發出 page_changed；只接受 PAGE_CALENDAR / PAGE_WATER / PAGE_SETTINGS。"""
         if page_index == PAGE_CALENDAR:
             btn = self.btn_calendar
+        elif page_index == PAGE_WATER:
+            btn = self.btn_water
         elif page_index == PAGE_SETTINGS:
             btn = self.btn_settings
         else:
