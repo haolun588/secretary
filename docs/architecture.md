@@ -5,6 +5,7 @@
 secretary/
 ├── CLAUDE.md                     # AI 協作規範與作業紅線
 ├── requirements.txt              # 直接依賴（固定版本）
+├── requirements-dev.txt          # 開發依賴（pytest，固定版本）
 ├── .gitignore
 ├── assets/                       # 圖示資源 (icon.ico / icon.png / arrow_up.png / arrow_down.png)
 ├── docs/
@@ -16,22 +17,27 @@ secretary/
 │   ├── config.json               # 使用者設定檔
 │   ├── credentials.json          # Google OAuth 憑證
 │   ├── token.json                # Google OAuth token
-│   └── logs/                     # 日誌目錄 (預留)
+│   └── logs/                     # 日誌目錄 (secretary.log，由 utils/logger.py 寫入，輪替 1MB x 3)
 ├── main.py                       # 主程式入口 (托盤圖示 QSystemTrayIcon、closeEvent 攔截與背景計時器)
 ├── scripts/                      # 開發/一次性工具腳本 (可直接 python scripts/xxx.py 執行)
 │   ├── create_shortcut.py        # 建立桌面捷徑與啟動 .bat
 │   ├── arrow_generator.py        # 箭頭圖示產生器
 │   └── icon_generator.py         # 應用程式圖示產生器
+├── tests/                        # 自動化測試 (pytest；不連網、不啟動 GUI、不碰真實 data/)
+│   ├── conftest.py               # 專案根加入 sys.path，並將測試期日誌導向暫存目錄
+│   └── test_*.py                 # theme / paths / config_manager / google_calendar / logger
 ├── ui/
 │   ├── main_window.py            # 主視窗外框 (包含 closeEvent 重寫，點擊 ✕ 隱藏至托盤)
 │   ├── nav_sidebar.py            # 左側選單欄元件
 │   ├── calendar_view.py          # 日曆頁面 (含大/中/小色彩標籤過濾提醒側邊欄)
 │   ├── settings_view.py          # 設定頁面 (喝水提醒間隔、開機自啟動控制)
 │   ├── calendar_dialog.py        # 行程新增/修改對話框 (含事件等級選單與刪除確認；提醒時間選單尚未實作)
+│   ├── theme.py                  # 深色精緻版主題 token 與 qss() 範本替換 (純資料，不依賴 PyQt6)
 │   └── toast_window.py           # 右下角喝水提醒彈窗 (含 3 秒淡出動畫)
 └── utils/
     ├── autostart.py              # 開機自啟動登錄檔控制模組 (支援 --minimized 靜默啟動)
     ├── config_manager.py         # 設定檔讀寫模組 (config.json 持久化)
+    ├── logger.py                 # 日誌設定 (get_logger，RotatingFileHandler 寫入 data/logs/)
     ├── google_calendar.py        # Google Calendar API 串接與 colorId 解析 (reminders.overrides 尚未實作)
     └── paths.py                  # 集中路徑定義 (data/、assets/ 絕對路徑與舊檔搬遷)
 ```

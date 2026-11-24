@@ -27,7 +27,23 @@
 - **系統托盤與關閉事件**：使用 `QSystemTrayIcon`，實現右鍵選單 (顯示主視窗 / 測試喝水提醒 / 系統與提醒設定 / 退出程式)。
 - **開機自啟**：透過 Windows Registry (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) 寫入包含 `pythonw main.py --minimized` 之啟動命令。
 - **設定儲存**：採用 JSON 格式儲存使用者設定 (`data/config.json`)。
-- **異常處理與日誌**：外部 API、檔案存取、登錄檔寫入須有 try-except，並使用 Python `logging` 寫入檔案（含時間戳，建議 `RotatingFileHandler`；日誌檔已被 `.gitignore` 的 `*.log` 排除）。因 `pythonw` 沒有 stdout，`print` 不能當作日誌。
+- **異常處理與日誌**：外部 API、檔案存取、登錄檔寫入須有 try-except，並使用 Python `logging` 寫入檔案（`utils/logger.py`，含時間戳，`RotatingFileHandler`；日誌檔位於被 `.gitignore` 排除的 `data/logs/`）。因 `pythonw` 沒有 stdout，`print` 不能當作日誌。
+
+### 2.1 日誌規範
+- 每個模組以 `from utils.logger import get_logger` 與 `logger = get_logger(__name__)` 取得 logger，**不使用 `print`**（`scripts/` 例外）。
+- 等級：一般狀態用 `info`，可忽略的異常用 `warning`，`except` 內的錯誤用 `logger.exception(...)` 保留 traceback，其他錯誤用 `error`。
+- 日誌檔位於 `data/logs/secretary.log`（`utils/paths.py` 的 `LOGS_DIR`）。`utils/paths.py` 為避免循環匯入，於函式內才取得 logger。
+- 第三方套件（`googleapiclient`、`google.auth`）的 WARNING 以上訊息會寫入同一個日誌檔。
+- 日誌不得記錄個資：行程標題、自啟命令等內容不寫入 info 以上等級（事件以 Google 回傳的 id 識別）。
+
+### 2.2 主題 token
+- 所有顏色、字級、間距、圓角集中於 `ui/theme.py`，新 UI 不應再硬編碼色碼。
+- QSS 範本以 `qss()` 代入，例如：`setStyleSheet(qss("QPushButton { background: {ACCENT}; border-radius: {RADIUS_MD}px; }"))`。只替換 `{全大寫TOKEN}`，未知 token 會 raise `KeyError`；數值 token 的 `px` 單位自行撰寫。
+
+### 2.3 測試規範
+- 測試放在 `tests/`，以 `python -m pytest` 執行；開發依賴見 `requirements-dev.txt`。
+- 測試不得啟動 GUI、不得連網（Google API / OAuth）、不得碰真實 `data/`，檔案一律使用 `tmp_path` + `monkeypatch`。
+- 匯入 `utils/google_calendar.py` 會修改全域 `socket.getaddrinfo` 與預設逾時，測試須在 fixture 中還原。
 
 ## 3. 開發階段
 （名稱與 `docs/progress.md` 一致）

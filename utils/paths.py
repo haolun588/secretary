@@ -6,7 +6,6 @@ utils/paths.py
 
 import os
 import shutil
-from datetime import datetime
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_DIR = os.path.join(PROJECT_DIR, "assets")
@@ -18,6 +17,12 @@ CREDENTIALS_PATH = os.path.join(DATA_DIR, "credentials.json")
 TOKEN_PATH = os.path.join(DATA_DIR, "token.json")
 
 _LEGACY_FILES = ("config.json", "credentials.json", "token.json")
+
+
+def _logger():
+    """延遲取得 logger（logger 會延遲匯入本模組，避免循環匯入）"""
+    from utils.logger import get_logger
+    return get_logger(__name__)
 
 
 def asset_path(name):
@@ -45,8 +50,7 @@ def migrate_legacy_files():
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
     except Exception as e:
-        ts = datetime.now().isoformat()
-        print(f"[{ts}] [paths] 建立 data/ 失敗: {e}")
+        _logger().exception("建立 data/ 失敗")
         for name in _LEGACY_FILES:
             result["failed"].append((name, str(e)))
         return result
@@ -59,12 +63,12 @@ def migrate_legacy_files():
                 continue
             if os.path.exists(new_path):
                 result["skipped_both_exist"].append(name)
-                print(f"[{datetime.now().isoformat()}] [paths] {name} 根目錄與 data/ 皆存在，未搬移（請手動確認）")
+                _logger().warning(f"{name} 根目錄與 data/ 皆存在，未搬移（請手動確認）")
                 continue
             shutil.move(old_path, new_path)
             result["moved"].append(name)
-            print(f"[{datetime.now().isoformat()}] [paths] 已將舊檔 {name} 搬移至 data/")
+            _logger().info(f"已將舊檔 {name} 搬移至 data/")
         except Exception as e:
             result["failed"].append((name, str(e)))
-            print(f"[{datetime.now().isoformat()}] [paths] 搬移 {name} 失敗: {e}")
+            _logger().exception(f"搬移 {name} 失敗")
     return result

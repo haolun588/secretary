@@ -7,6 +7,10 @@ import sys
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QGraphicsOpacityEffect
 
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 try:
     import winsound
 except ImportError:
@@ -26,7 +30,7 @@ class ToastWindow(QWidget):
             try:
                 winsound.MessageBeep(winsound.MB_OK)
             except Exception as e:
-                print(f"[ToastWindow] 音效播放忽略: {e}")
+                logger.warning(f"音效播放忽略: {e}")
 
     def init_ui(self, title, message):
         self.setWindowFlags(

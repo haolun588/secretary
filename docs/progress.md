@@ -37,12 +37,18 @@
 4. 雲端回傳空清單時本地不清空（`if events:`），離線與「真的沒有行程」無法區分。
 5. 新增/編輯/刪除與啟動時 `check_connection` 在主執行緒阻塞。
 6. 背景 fetch 與 UI 共用同一個 service，httplib2 非 thread-safe。
-7. 日誌使用 `print`，在 `pythonw` 下全部遺失。
+7. ~~日誌使用 `print`，在 `pythonw` 下全部遺失。~~（2026-11-24 階段 A 已處理：改用 `utils/logger.py`，寫入 `data/logs/secretary.log`）
 8. autostart 預設開啟，且每次啟動都寫入 Registry。
 9. 只抓 `timeMin=now`、`maxResults=100`，未處理 `nextPageToken`；過去日期一律空白。
 10. ~~箭頭圖示 QSS 使用相對路徑 `assets/...`~~（2026-11-24 工作區整理已修正：改用 `utils/paths.py` 絕對路徑）。
-11. 尚無自動化測試。
+11. ~~尚無自動化測試。~~（2026-11-24 階段 A 已建立 `tests/` 測試骨架，`python -m pytest` 全數通過）
 12. ~~重複／未使用程式碼~~（2026-11-24 工作區整理已修正：刪除 `preview_ui.py`、`utils/shortcut_creator.py`，產生器與捷徑腳本移至 `scripts/`）。
+
+## 📌 階段 A: 基礎建設 (已完成，2026-11-24)
+- [x] `utils/logger.py`：`get_logger(__name__)`，RotatingFileHandler 寫入 `data/logs/secretary.log`，pythonw 無 stdout 時不加 StreamHandler，建立目錄或開檔失敗不崩潰
+- [x] `main.py`、`ui/`、`utils/` 所有 `print` 改為 logger（`scripts/` 保留 print）
+- [x] `ui/theme.py`：深色精緻版主題 token 與 `qss()` 範本替換（尚未套用到現有 UI，留待階段 C）
+- [x] `tests/` 測試骨架與 `requirements-dev.txt`（pytest 固定版本）
 
 ## 📌 Phase 4: Google 日曆原生多階段提醒支援 (規劃中)
 - [ ] `utils/google_calendar.py`: 擴充 `add_event` / `update_event` 支援傳送 `reminders.overrides`（包含 10 分鐘、30 分鐘、1 小時、1 天等多階段提醒）

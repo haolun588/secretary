@@ -7,7 +7,10 @@ import os
 import socket
 from datetime import datetime
 from PyQt6.QtCore import QThread, pyqtSignal
+from utils.logger import get_logger
 from utils.paths import CREDENTIALS_PATH, TOKEN_PATH
+
+logger = get_logger(__name__)
 
 try:
     _orig_getaddrinfo = socket.getaddrinfo
@@ -17,7 +20,7 @@ try:
         return ipv4_res if ipv4_res else res
     socket.getaddrinfo = _ipv4_only_getaddrinfo
 except Exception as e:
-    print(f"[GoogleCalendar] IPv4 網路修復套用失敗: {e}")
+    logger.exception("IPv4 網路修復套用失敗")
 
 COLOR_PRIORITY_MAP = {
     "11": "major",  # Tomato (番茄大紅)
@@ -64,15 +67,15 @@ class GoogleCalendarService:
             if force_interactive and os.path.exists(self.token_file):
                 try:
                     os.remove(self.token_file)
-                    print(f"[{datetime.now().isoformat()}] [GoogleCalendar] 已清除舊有 token.json 憑證")
+                    logger.info("已清除舊有 token.json 憑證")
                 except Exception as e:
-                    print(f"[{datetime.now().isoformat()}] 清除舊 Token 失敗: {e}")
+                    logger.exception("清除舊 Token 失敗")
 
             if os.path.exists(self.token_file):
                 try:
                     creds = Credentials.from_authorized_user_file(self.token_file, scopes)
                 except Exception as e:
-                    print(f"[{datetime.now().isoformat()}] token.json 讀取異常: {e}")
+                    logger.exception("token.json 讀取異常")
                     creds = None
 
             if creds:
@@ -82,21 +85,21 @@ class GoogleCalendarService:
                     return True
                 elif creds.expired and creds.refresh_token:
                     try:
-                        print(f"[{datetime.now().isoformat()}] [GoogleCalendar] 偵測到 Token 過期，正在背景自動靜默續約...")
+                        logger.info("偵測到 Token 過期，正在背景自動靜默續約...")
                         creds.refresh(Request(timeout=6))
                         with open(self.token_file, 'w', encoding='utf-8') as token:
                             token.write(creds.to_json())
-                        print(f"[{datetime.now().isoformat()}] [GoogleCalendar] 🎉 背景自動續約成功！")
+                        logger.info("🎉 背景自動續約成功！")
                         self.service = build('calendar', 'v3', credentials=creds)
                         self.is_connected = True
                         return True
                     except Exception as e:
-                        print(f"[{datetime.now().isoformat()}] 背景自動續約失敗: {e}")
+                        logger.exception("背景自動續約失敗")
                         creds = None
 
             # 若上面無法自動靜默登入 (例如 creds 無效或 refresh 失敗)
             if not force_interactive:
-                print(f"[{datetime.now().isoformat()}] [GoogleCalendar] 背景靜默認證失敗，放棄自動彈出瀏覽器視窗")
+                logger.warning("背景靜默認證失敗，放棄自動彈出瀏覽器視窗")
                 self.is_connected = False
                 return False
 
@@ -116,6 +119,7 @@ class GoogleCalendarService:
                     open_browser=True
                 )
             except Exception as e_server:
+                logger.warning(f"固定 port 8080 授權流程失敗，改用隨機 port: {e_server}")
                 creds = flow.run_local_server(
                     port=0,
                     access_type='offline',
@@ -134,7 +138,7 @@ class GoogleCalendarService:
                 self.is_connected = False
                 return False
         except Exception as e:
-            print(f"[{datetime.now().isoformat()}] [GoogleCalendar] 授權認證失敗: {e}")
+            logger.exception("授權認證失敗")
             self.is_connected = False
             return False
 
@@ -150,7 +154,7 @@ class GoogleCalendarService:
             self.is_connected = True
             return True
         except Exception as e:
-            print(f"[{datetime.now().isoformat()}] [GoogleCalendar] 實質 API 通訊失敗: {e}")
+            logger.exception("實質 API 通訊失敗")
             self.is_connected = False
             return False
 
@@ -191,7 +195,7 @@ class GoogleCalendarService:
                 })
             return formatted_events
         except Exception as e:
-            print(f"[{datetime.now().isoformat()}] [GoogleCalendar] 讀取 Google 日曆異常: {e}")
+            logger.exception("讀取 Google 日曆異常")
             return []
 
     def add_event(self, event_data):
@@ -234,10 +238,10 @@ class GoogleCalendarService:
             }
 
             created = self.service.events().insert(calendarId='primary', body=body).execute()
-            print(f"[{datetime.now().isoformat()}] [GoogleCalendar] 成功新增至 Google 雲端: {event_data.get('title')}")
+            logger.info(f"成功新增至 Google 雲端，事件 ID: {created.get('id')}")
             return created
         except Exception as e:
-            print(f"[{datetime.now().isoformat()}] [GoogleCalendar] 寫入 Google 雲端失敗: {e}")
+            logger.exception("寫入 Google 雲端失敗")
             return False
 
     def update_event(self, event_data):
@@ -282,10 +286,10 @@ class GoogleCalendarService:
             }
 
             updated = self.service.events().update(calendarId='primary', eventId=event_id, body=body).execute()
-            print(f"[{datetime.now().isoformat()}] [GoogleCalendar] 成功於 Google 雲端更新行程 ID: {event_id}")
+            logger.info(f"成功於 Google 雲端更新行程 ID: {event_id}")
             return updated
         except Exception as e:
-            print(f"[{datetime.now().isoformat()}] [GoogleCalendar] Google 雲端更新行程失敗: {e}")
+            logger.exception("Google 雲端更新行程失敗")
             return False
 
     def delete_event(self, event_id):
@@ -297,10 +301,10 @@ class GoogleCalendarService:
 
         try:
             self.service.events().delete(calendarId='primary', eventId=event_id).execute()
-            print(f"[{datetime.now().isoformat()}] [GoogleCalendar] 成功於 Google 雲端刪除行程 ID: {event_id}")
+            logger.info(f"成功於 Google 雲端刪除行程 ID: {event_id}")
             return True
         except Exception as e:
-            print(f"[{datetime.now().isoformat()}] [GoogleCalendar] Google 雲端刪除行程失敗: {e}")
+            logger.exception("Google 雲端刪除行程失敗")
             return False
 
 
@@ -316,5 +320,5 @@ class GoogleFetchWorker(QThread):
             events = self.service.fetch_upcoming_events()
             self.fetched_signal.emit(events)
         except Exception as e:
-            print(f"[{datetime.now().isoformat()}] [GoogleFetchWorker] 背景拉取異常: {e}")
+            logger.exception("背景拉取異常")
             self.fetched_signal.emit([])

@@ -7,18 +7,20 @@ Secretary 智能桌面小助理 - 主程式入口 (Application Entry Point)
 
 import sys
 import os
-from datetime import datetime
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 from PyQt6.QtGui import QIcon, QAction, QPixmap, QColor, QPainter
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
+from utils.logger import get_logger
 from utils.paths import asset_path, ensure_data_dirs, migrate_legacy_files
+
+logger = get_logger("main")
 try:
     ensure_data_dirs()
     migrate_legacy_files()
 except Exception as _e:
-    print(f"[{datetime.now().isoformat()}] [main] 初始化 data/ 目錄或搬移舊檔失敗，繼續執行: {_e}")
+    logger.exception("初始化 data/ 目錄或搬移舊檔失敗，繼續執行")
 
 from utils.config_manager import ConfigManager
 from utils.autostart import AutoStartManager
@@ -109,7 +111,7 @@ class SecretaryApp:
             if "SHOW" in msg:
                 self.show_main_window()
         except Exception as e:
-            print(f"[SecretaryApp] 處理喚醒訊號異常: {e}")
+            logger.exception("處理喚醒訊號異常")
         finally:
             client_socket.disconnectFromServer()
 
@@ -189,7 +191,7 @@ class SecretaryApp:
             toast.destroyed.connect(lambda obj, t=toast: self.cleanup_toast(t))
             toast.show()
         except Exception as e:
-            print(f"[SecretaryApp] 觸發提醒彈窗異常: {e}")
+            logger.exception("觸發提醒彈窗異常")
 
     def cleanup_toast(self, toast_instance):
         if toast_instance in self.active_toasts:
@@ -232,7 +234,7 @@ class SecretaryApp:
                 self.show_main_window()
 
     def quit_app(self):
-        print(f"[{datetime.now().isoformat()}] [SecretaryApp] 正在退出 Secretary 小助理...")
+        logger.info("正在退出 Secretary 小助理...")
         self.second_timer.stop()
         QLocalServer.removeServer(SINGLE_INSTANCE_SOCKET)
         self.tray_icon.hide()
@@ -242,7 +244,7 @@ class SecretaryApp:
         if not self.is_minimized:
             self.show_main_window()
         else:
-            print(f"[{datetime.now().isoformat()}] [SecretaryApp] 開機靜默啟動模式：隱藏於背景系統托盤")
+            logger.info("開機靜默啟動模式：隱藏於背景系統托盤")
         
         return self.app.exec()
 
@@ -254,7 +256,7 @@ def is_already_running():
         socket.write(b"SHOW")
         socket.waitForBytesWritten(500)
         socket.disconnectFromServer()
-        print(f"[{datetime.now().isoformat()}] [SecretaryApp] 小助理已在背景運作中，已喚醒現有視窗。")
+        logger.info("小助理已在背景運作中，已喚醒現有視窗。")
         return True
     return False
 

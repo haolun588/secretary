@@ -12,8 +12,11 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QFont, QColor, QPalette, QTextCharFormat
 
 from ui.calendar_dialog import CalendarDialog
+from utils.logger import get_logger
 from utils.paths import asset_path, qss_url
 from utils.google_calendar import GoogleCalendarService, GoogleFetchWorker
+
+logger = get_logger(__name__)
 
 class CalendarView(QWidget):
     def __init__(self, parent=None):
@@ -462,7 +465,7 @@ class CalendarView(QWidget):
                 elif isinstance(child, QTableView) or child.inherits("QTableView") or "CalendarView" in child.metaObject().className():
                     child.setStyleSheet("background-color: #1c1c24; color: #ffffff; selection-background-color: #8b5cf6;")
         except Exception as e:
-            print(f"[CalendarView] 樣式覆蓋: {e}")
+            logger.warning(f"樣式覆蓋: {e}")
 
     def sync_google_events(self):
         if self.fetch_worker and self.fetch_worker.isRunning():
@@ -717,7 +720,7 @@ class CalendarView(QWidget):
                     g_evt["date"] = g_date
                     self.mock_events.append(g_evt)
                 except Exception as e:
-                    print(f"[CalendarView] 解析 Google 行程時間失敗: {e}")
+                    logger.exception("解析 Google 行程時間失敗")
 
             self.refresh_upcoming_sidebar()
             self.on_date_selected()

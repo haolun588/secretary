@@ -8,7 +8,10 @@ import os
 import json
 from datetime import datetime
 
+from utils.logger import get_logger
 from utils.paths import CONFIG_PATH, DATA_DIR
+
+logger = get_logger(__name__)
 
 DEFAULT_CONFIG = {
     "interval_minutes": 10,
@@ -31,7 +34,7 @@ class ConfigManager:
                     config.update(data)
                     return config
         except Exception as e:
-            print(f"[{datetime.now().isoformat()}] [ConfigManager] 讀取設定檔失敗，使用預設值: {e}")
+            logger.exception("讀取設定檔失敗，使用預設值")
         
         return DEFAULT_CONFIG.copy()
 
@@ -48,5 +51,5 @@ class ConfigManager:
                 json.dump(config, f, ensure_ascii=False, indent=4)
             return True
         except Exception as e:
-            print(f"[{datetime.now().isoformat()}] [ConfigManager] 寫入設定檔失敗: {e}")
+            logger.exception("寫入設定檔失敗")
             return False

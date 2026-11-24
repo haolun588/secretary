@@ -6,8 +6,10 @@ Windows 開機自動啟動登錄檔控制模組 (Auto-Start Registry Helper)
 
 import sys
 import os
-from datetime import datetime
+from utils.logger import get_logger
 from utils.paths import PROJECT_DIR
+
+logger = get_logger(__name__)
 
 REG_KEY_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
 APP_NAME = "SecretaryAssistant"
@@ -33,7 +35,7 @@ class AutoStartManager:
     def set_autostart(enable=True):
         """開啟或關閉 Windows 開機自動啟動"""
         if sys.platform != "win32":
-            print(f"[{datetime.now().isoformat()}] [AutoStartManager] 非 Windows 系統，略過登錄檔寫入")
+            logger.warning("非 Windows 系統，略過登錄檔寫入")
             return False
 
         try:
@@ -43,18 +45,19 @@ class AutoStartManager:
             if enable:
                 cmd = AutoStartManager.get_executable_command()
                 winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, cmd)
-                print(f"[{datetime.now().isoformat()}] [AutoStartManager] 已設定開機自啟動: {cmd}")
+                logger.info("已設定開機自啟動")
+                logger.debug(f"開機自啟命令: {cmd}")
             else:
                 try:
                     winreg.DeleteValue(key, APP_NAME)
-                    print(f"[{datetime.now().isoformat()}] [AutoStartManager] 已取消開機自啟動")
+                    logger.info("已取消開機自啟動")
                 except FileNotFoundError:
                     pass
             
             winreg.CloseKey(key)
             return True
         except Exception as e:
-            print(f"[{datetime.now().isoformat()}] [AutoStartManager] 登錄檔操作失敗: {e}")
+            logger.exception("登錄檔操作失敗")
             return False
 
     @staticmethod
@@ -74,5 +77,5 @@ class AutoStartManager:
                 winreg.CloseKey(key)
                 return False
         except Exception as e:
-            print(f"[{datetime.now().isoformat()}] [AutoStartManager] 查詢開機自啟啟狀態失敗: {e}")
+            logger.exception("查詢開機自啟啟狀態失敗")
             return False
