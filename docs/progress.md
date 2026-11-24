@@ -20,15 +20,29 @@
 ## 📌 Phase 3: Google Calendar 雲端雙向串接與進階防護 (已完成)
 - [x] Google OAuth2 API 授權整合 (`google-api-python-client`, `credentials.json`, `token.json`)
 - [x] `.gitignore` 檔案維護，徹底保護敏感憑證與 Token 不遭 Git 追蹤
-- [x] 背景非同步 QThread 載入 (`GoogleFetchWorker`) 與全局 IPv4 socket 逾時防護 (0.0 秒瞬間秒開，完全防卡死閃退)
+- [x] 行程讀取已移至背景 QThread (`GoogleFetchWorker`)，並設有全局 IPv4 socket 逾時（新增/編輯/刪除、OAuth 與啟動時 `check_connection` 仍在主執行緒執行，見已知問題）
 - [x] 背景無感自動續約 (Auto-Refresh `refresh_token`)
 - [x] 實質 API 健康度通訊檢查 (`check_connection()`)
 - [x] Google 日曆全色彩標籤級別對應 (紅:大30天 / 黃橘:中7天 / 綠:小3天)
 - [x] 編輯行程右下角三鈕區 (`[取消]` `[🗑️ 刪除行程]` `[儲存行程]`)
 - [x] 專屬暗黑紫紅刪除確認對話框 (`ConfirmDeleteDialog`)
-- [x] 雲端 2-Way 雙向讀取、新增 (`add_event`)、更新 (`update_event`) 與刪除 (`delete_event`)
+- [x] Google 日曆讀取、新增 (`add_event`)、更新 (`update_event`) 與刪除 (`delete_event`) 功能已實作（同步邏輯尚有缺陷，見已知問題）
 - [x] 桌面 256x256 高畫質紫光電光圖示 `icon.png` / `icon.ico`
 - [x] Windows 桌面捷徑 `Secretary 智能桌面小助理.lnk` 自動建立
+
+## ⚠️ 已知問題（2026-11-24 審查）
+1. 編輯行程時對話框不帶入原日期時間，儲存時不回寫 start/end；全天行程更新時會被轉成 09:00 至隔天 10:00 的定時行程；使用 `events().update` 整筆覆蓋會清掉未帶欄位（`calendar_dialog.py`、`calendar_view.py` `on_edit_event`、`google_calendar.py` `update_event`）。
+2. OAuth 在主執行緒執行且 `run_local_server` 無逾時，未授權時 UI 會凍結（`settings_view.py`）。
+3. 新增行程使用假 id `len+1`，忽略 Google 回傳的 id；寫入失敗時仍修改本地資料且無提示。
+4. 雲端回傳空清單時本地不清空（`if events:`），離線與「真的沒有行程」無法區分。
+5. 新增/編輯/刪除與啟動時 `check_connection` 在主執行緒阻塞。
+6. 背景 fetch 與 UI 共用同一個 service，httplib2 非 thread-safe。
+7. 日誌使用 `print`，在 `pythonw` 下全部遺失。
+8. autostart 預設開啟，且每次啟動都寫入 Registry。
+9. 只抓 `timeMin=now`、`maxResults=100`，未處理 `nextPageToken`；過去日期一律空白。
+10. 箭頭圖示 QSS 使用相對路徑 `assets/...`，開機自啟時可能失效（`calendar_view.py`）。
+11. 尚無自動化測試。
+12. 重複／未使用程式碼：`utils/shortcut_creator.py` 與 `create_shortcut.py` 重複、`utils/arrow_generator.py` 與 `utils/icon_generator.py` 未被引用、`preview_ui.py` 實際會連線 Google。
 
 ## 📌 Phase 4: Google 日曆原生多階段提醒支援 (規劃中)
 - [ ] `utils/google_calendar.py`: 擴充 `add_event` / `update_event` 支援傳送 `reminders.overrides`（包含 10 分鐘、30 分鐘、1 小時、1 天等多階段提醒）

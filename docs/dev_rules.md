@@ -1,8 +1,6 @@
 # 專案開發規範與技術指南 (Dev Rules & Tech Guidelines)
 
-- **Obey User Communication Preference**:
-  - 當使用者提出問題或諮詢時，**必須先以清晰簡潔的中文回答說明**，**絕不可未經確認直接修改程式碼或檔案**。
-  - 需等與使用者討論確認或使用者明確指示修改時，方可進行程式碼編輯。
+> AI 協作規範見根目錄 `CLAUDE.md`。
 
 ## 1. 專案目標與核心功能
 本專案名為 **Secretary (桌面小助理)**，主要功能包括：
@@ -14,24 +12,36 @@
 - **定時喝水提醒**：每 N 分鐘（預設 10 分鐘，可透過 UI 調整）於螢幕右下角彈出提醒視窗，顯示約 3 秒後自動淡出 (Fade-out)。
 - **Google 日曆整合與色彩標籤等級對應**：
   - 主介面整合日曆，支援串接 Google Calendar API。
-  - **Google 日曆色彩標籤 (Event Color ID) 對應規則**：
-    - 🔴 **紅色系 (Color ID 11 / Tomato)** ➔ **大事件 (提前 30 天/1個月顯示於右側提醒欄)**
-    - 🟡 **黃色/橘色系 (Color ID 5 / Banana 或 Color ID 4 / Flamingo)** ➔ **中事件 (提前 7 天/1週顯示於右側提醒欄)**
-    - 🟢 **綠色系 / 預設色 (Color ID 2 / Sage 或預設藍)** ➔ **小事件 (提前 3 天顯示於右側提醒欄)**
+  - **Google 日曆色彩標籤 (Event Color ID) 對應規則**（以 `utils/google_calendar.py` 的 `COLOR_PRIORITY_MAP` 為準）：
+    - **Color ID 11 (Tomato)、4 (Flamingo)** ➔ **大事件 (提前 30 天/1個月顯示於右側提醒欄)**
+    - **Color ID 5 (Banana)、6 (Tangerine)** ➔ **中事件 (提前 7 天/1週顯示於右側提醒欄)**
+    - **Color ID 2 (Sage)、10 (Basil)** ➔ **小事件 (提前 3 天顯示於右側提醒欄)**
+    - **未對應的顏色與預設色（無 colorId，或其他 ID 如 1、3、7、8、9）** ➔ 實際被當成**小事件**（`parse_priority_from_color` 預設值為 `minor`）。
 - **Google 日曆原生多階段提醒 (reminders.overrides)**：
   - 全面使用 Google API 原生 `reminders` 欄位傳遞與讀取通知時間（支援多選：如 10 分鐘前、30 分鐘前、1 小時前、1 天前）。
-  - 與手機 App 及網頁版設定完美跨平台同步，棄用外掛獨立文字標籤，供雲端 Bot 統一發送多階段推播。
+  - 與手機 App 及網頁版設定完美跨平台同步，棄用外掛獨立文字標籤，供其他提醒端統一讀取。（雲端 Bot / Discord 不屬於本 repo 範圍。）
 
 ## 2. 技術選型與約束 (Tech Stack & Constraints)
 - **作業系統目標**：Windows 10 / 11
 - **UI & 框架**：採用 Python + PyQt6，以 `QStackedWidget` 結合左側側邊欄導覽按鈕 (`Navigation Bar`)，建構流暢無縫的分頁切換體驗。
-- **系統托盤與關閉事件**：使用 `QSystemTrayIcon`，實現右鍵選單 (顯示主視窗 / 測試喝水提醒 / 退出程式)。
+- **系統托盤與關閉事件**：使用 `QSystemTrayIcon`，實現右鍵選單 (顯示主視窗 / 測試喝水提醒 / 系統與提醒設定 / 退出程式)。
 - **開機自啟**：透過 Windows Registry (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) 寫入包含 `pythonw main.py --minimized` 之啟動命令。
 - **設定儲存**：採用 JSON 格式儲存使用者設定 (`config.json`)。
-- **異常處理**：外部 API、檔案存取、登錄檔寫入皆須包含 Try-Except 區塊與時間戳日誌。
+- **異常處理與日誌**：外部 API、檔案存取、登錄檔寫入須有 try-except，並使用 Python `logging` 寫入檔案（含時間戳，建議 `RotatingFileHandler`；日誌檔已被 `.gitignore` 的 `*.log` 排除）。因 `pythonw` 沒有 stdout，`print` 不能當作日誌。
 
-## 3. 開發三階段流程守則
-1. **Phase 1 (文件與規格)**：完成 `progress.md`, `dev_rules.md`, `architecture.md` 建立。
-2. **Phase 2 (UI 優先設計)**：完成靜態視覺設計。
-3. **Phase 3 (邏輯實現與自動化)**：實現定時器、托盤選單、關閉隱藏、開機靜默自啟、Google 日曆 API 串接與色彩標籤過濾。
-4. **Phase 4 (原生多階段提醒擴充)**：實現行程編輯對話框提醒選擇 UI 與 `reminders.overrides` 讀寫。
+## 3. 開發階段
+（名稱與 `docs/progress.md` 一致）
+1. **Phase 1 基礎架構與桌面 UI 介面**
+2. **Phase 2 喝水提醒與系統整合**
+3. **Phase 3 Google Calendar 雲端雙向串接與進階防護**
+4. **Phase 4 Google 日曆原生多階段提醒支援**（規劃中）：實現行程編輯對話框提醒選擇 UI 與 `reminders.overrides` 讀寫。
+
+## 4. 同步原則
+> 以下為目標規範，現行程式尚未完全符合（見 `docs/progress.md` 已知問題）。
+
+- Google Calendar 為唯一資料來源。
+- 寫入成功後才更新本地 UI（或寫入後重新拉取）。
+- 使用 Google 回傳的 event id，不自行產生假 id。
+- 部分更新使用 `events().patch`，避免 `update` 整筆覆蓋清掉未帶欄位。
+- 全天行程使用 `{'date': ...}` 而非 `dateTime`。
+- 網路呼叫（Google API、OAuth）在背景執行緒執行，不阻塞 Qt 主執行緒。
