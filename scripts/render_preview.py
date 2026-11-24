@@ -279,7 +279,79 @@ def build_main_water():
     return win
 
 
-# 名稱 -> (建構函式, 寬, 高)；尚未實作的畫面見 TODO_SCREENS
+def _build_settings(authenticated):
+    from ui.nav_sidebar import PAGE_SETTINGS
+    from ui.main_window import MainWindow
+    store = FakeStore(authenticated=authenticated)
+    win = MainWindow(FakeConfig(), store)
+    win.sidebar.set_countdown(8 * 60 + 42)
+    win.sidebar.set_active_page(PAGE_SETTINGS)
+    cfg = FakeConfig().load_config()
+    view = win.settings_view
+    view.chk_water_enabled.setChecked(cfg["water_enabled"])
+    view.spin_interval.setValue(cfg["interval_minutes"])
+    view.chk_autostart.setChecked(cfg["autostart"])
+    view.chk_minimize_to_tray.setChecked(cfg["minimize_to_tray"])
+    store.auth_state_changed.emit(authenticated)
+    return win
+
+
+def build_settings():
+    return _build_settings(False)
+
+
+def build_settings_connected():
+    return _build_settings(True)
+
+
+def _sample_event(all_day=False):
+    for evt in make_fake_events():
+        if bool(evt["all_day"]) == all_day and evt["priority"] in ("major", "medium"):
+            return evt
+    raise RuntimeError("找不到範例行程")
+
+
+def build_dialog_new():
+    from PyQt6.QtCore import QDate
+    from ui.calendar_dialog import CalendarDialog
+    return CalendarDialog(default_date=QDate.currentDate())
+
+
+def build_dialog_edit():
+    from ui.calendar_dialog import CalendarDialog
+    return CalendarDialog(event_data=_sample_event(all_day=False))
+
+
+def build_dialog_allday():
+    from ui.calendar_dialog import CalendarDialog
+    return CalendarDialog(event_data=_sample_event(all_day=True))
+
+
+def build_confirm_delete():
+    from ui.calendar_dialog import ConfirmDeleteDialog
+    return ConfirmDeleteDialog("專題報告")
+
+
+def build_toast_water():
+    from ui.toast_window import ToastWindow
+    return ToastWindow(
+        title="該喝水了", message="久坐一段時間了，起來喝杯水、活動一下吧。", kind="water",
+        actions=[("延後 10 分鐘", lambda: None), ("已喝", lambda: None)])
+
+
+def build_toast_danger():
+    from ui.toast_window import ToastWindow
+    return ToastWindow(title="同步失敗", message="無法連線到 Google 日曆，請檢查網路後再試一次。",
+                       kind="danger")
+
+
+def build_tray_menu_preview():
+    from ui.tray_menu import build_tray_menu
+    noop = lambda: None  # noqa: E731
+    return build_tray_menu({"show": noop, "test_water": noop, "settings": noop, "quit": noop})
+
+
+# 名稱 -> (建構函式, 寬, 高)；寬或高為 None 時依內容 adjustSize
 SCREENS = {
     "components": (build_components, 900, 560),
     "main_shell_1180x740": (build_main_shell, theme.WINDOW_W, theme.WINDOW_H),
@@ -290,14 +362,19 @@ SCREENS = {
     "main_week": (build_main_week, theme.WINDOW_W, theme.WINDOW_H),
     "main_day": (build_main_day, theme.WINDOW_W, theme.WINDOW_H),
     "main_month_empty": (build_main_month_empty, theme.WINDOW_W, theme.WINDOW_H),
+    "settings": (build_settings, theme.WINDOW_W, theme.WINDOW_H),
+    "settings_connected": (build_settings_connected, theme.WINDOW_MIN_W, theme.WINDOW_MIN_H),
+    "dialog_new": (build_dialog_new, None, None),
+    "dialog_edit": (build_dialog_edit, None, None),
+    "dialog_allday": (build_dialog_allday, None, None),
+    "confirm_delete": (build_confirm_delete, None, None),
+    "toast_water": (build_toast_water, None, None),
+    "toast_danger": (build_toast_danger, None, None),
+    "tray_menu": (build_tray_menu_preview, None, None),
 }
 
-# TODO（後續批次補上）：
-TODO_SCREENS = [
-    "settings",
-    "dialog_new", "dialog_edit", "dialog_allday", "confirm_delete",
-    "toast_water", "toast_danger", "tray_menu",
-]
+# 頂層透明 / 彈出視窗：貼到 BG 底色畫布上再存檔
+COMPOSITE_ON_BG = {"toast_water", "toast_danger", "tray_menu"}
 
 
 def _load_preview_fonts():
@@ -310,20 +387,42 @@ def _load_preview_fonts():
             QFontDatabase.addApplicationFont(path)
 
 
+def _save_grab(widget, path, on_bg):
+    pixmap = widget.grab()
+    if not on_bg:
+        return pixmap.save(path)
+    from PyQt6.QtGui import QImage, QPainter
+    from ui.styles import qcolor
+    margin = theme.SPACE_5
+    image = QImage(pixmap.width() + 2 * margin, pixmap.height() + 2 * margin,
+                   QImage.Format.Format_ARGB32_Premultiplied)
+    image.fill(qcolor(theme.BG))
+    painter = QPainter(image)
+    painter.drawPixmap(margin, margin, pixmap)
+    painter.end()
+    return image.save(path)
+
+
 def render_all(out_dir):
     os.makedirs(out_dir, exist_ok=True)
     app = QApplication.instance() or QApplication([])
     _load_preview_fonts()
     apply_app_style(app)
+    # 預覽不要發出系統提示音
+    from ui.toast_window import ToastWindow
+    ToastWindow.play_notification_sound = lambda self: None
     written = []
     for name, (builder, w, h) in SCREENS.items():
         try:
             widget = builder()
-            widget.resize(w, h)
+            if w is not None and h is not None:
+                widget.resize(w, h)
             widget.show()
+            if w is None or h is None:
+                widget.adjustSize()
             app.processEvents()
             path = os.path.join(out_dir, f"{name}.png")
-            if widget.grab().save(path):
+            if _save_grab(widget, path, name in COMPOSITE_ON_BG):
                 written.append(path)
             else:
                 print(f"[略過] {name}: 存檔失敗")
@@ -332,8 +431,6 @@ def render_all(out_dir):
         except Exception as e:  # noqa: BLE001  預覽腳本：單張失敗不影響其他
             print(f"[略過] {name}: {e}")
             traceback.print_exc()
-    for name in TODO_SCREENS:
-        print(f"[TODO] {name}: 尚未實作")
     return written
 
 

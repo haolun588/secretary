@@ -53,3 +53,16 @@ class ConfigManager:
         except Exception as e:
             logger.exception("寫入設定檔失敗")
             return False
+
+
+def save_config_or_warn(config, saver, notify):
+    """以 saver(config) 寫入設定；失敗（回傳假值或拋例外）時呼叫 notify(title, message) 提示使用者。
+    回傳是否成功。"""
+    try:
+        ok = bool(saver(config))
+    except Exception:
+        logger.exception("儲存設定時發生例外")
+        ok = False
+    if not ok:
+        notify("設定儲存失敗", "無法寫入設定檔，這次的變更下次啟動時可能不會保留。")
+    return ok

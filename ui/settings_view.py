@@ -1,233 +1,195 @@
 """
 ui/settings_view.py
-系統與喝水提醒設定頁面 (Settings & Configuration View) - 移除備份儲存按鈕
-所有設定選項 (喝水開關、時間間隔) 均為實時自動儲存 (Auto-Save)，無需手動點擊儲存按鈕。
+設定頁（段落式清單）：喝水提醒、一般、Google 日曆。
+所有設定皆即時生效並由 main.py 即時儲存，沒有「儲存」按鈕。樣式由全域 QSS（_SETTINGS）負責。
 """
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
-    QPushButton, QCheckBox, QFrame, QGroupBox, QMessageBox, QScrollArea
+    QCheckBox, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton, QScrollArea, QSpinBox,
+    QVBoxLayout, QWidget,
 )
-from ui.toast_window import ToastWindow
+
+from ui import icons, theme
+from ui.confirm_dialog import ConfirmDialog
+from ui.styles import repolish
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+WATER_INTERVAL_RANGE = (1, 180)
+
+
+class SettingsRow(QFrame):
+    """設定列：左側標題 + 說明，右側控制項。last=True 時不畫下分隔線。"""
+
+    def __init__(self, title, desc=None, control=None, last=False, desc_widget=None, parent=None):
+        super().__init__(parent)
+        self.setObjectName("SettingsRow")
+        self.setProperty("last", "true" if last else "false")
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(theme.SPACE_4, theme.SPACE_3, theme.SPACE_4, theme.SPACE_3)
+        layout.setSpacing(theme.SPACE_4)
+
+        text_col = QVBoxLayout()
+        text_col.setSpacing(theme.SPACE_1)
+        self.title_label = QLabel(title, self)
+        self.title_label.setObjectName("SettingsRowTitle")
+        text_col.addWidget(self.title_label)
+
+        self.desc_label = None
+        if desc_widget is not None:
+            text_col.addWidget(desc_widget)
+        elif desc:
+            self.desc_label = QLabel(desc, self)
+            self.desc_label.setObjectName("SettingsRowDesc")
+            self.desc_label.setWordWrap(True)
+            text_col.addWidget(self.desc_label)
+        layout.addLayout(text_col, 1)
+
+        if control is not None:
+            layout.addWidget(control, 0, Qt.AlignmentFlag.AlignVCenter)
+
+
+def _make_switch(parent):
+    chk = QCheckBox(parent)
+    chk.setProperty("variant", "switch")
+    chk.setCursor(Qt.CursorShape.PointingHandCursor)
+    return chk
+
+
 class SettingsView(QWidget):
     water_enabled_signal = pyqtSignal(bool)
     autostart_signal = pyqtSignal(bool)
+    minimize_to_tray_signal = pyqtSignal(bool)
+    test_toast_requested = pyqtSignal()
 
     def __init__(self, event_store, parent=None):
         super().__init__(parent)
         self.event_store = event_store
+        self._auth_failed = False
         self.init_ui()
 
+    # ------------------------------------------------------------ 版面
+
+    def _add_section(self, layout, title, rows):
+        """加入「段落標題 + 圓角群組（多列）」；回傳群組 QFrame。"""
+        section = QWidget(self._container)
+        s_layout = QVBoxLayout(section)
+        s_layout.setContentsMargins(0, 0, 0, 0)
+        s_layout.setSpacing(theme.SPACE_2)
+
+        label = QLabel(title, section)
+        label.setProperty("role", "section")
+        s_layout.addWidget(label)
+
+        group = QFrame(section)
+        group.setObjectName("SettingsGroup")
+        g_layout = QVBoxLayout(group)
+        g_layout.setContentsMargins(0, 0, 0, 0)
+        g_layout.setSpacing(0)
+        for i, row in enumerate(rows):
+            row.setProperty("last", "true" if i == len(rows) - 1 else "false")
+            g_layout.addWidget(row)
+        s_layout.addWidget(group)
+
+        layout.addWidget(section)
+        return group, section
+
     def init_ui(self):
-        self.setStyleSheet("""
-            QWidget#SettingsView {
-                background-color: #121217;
-                color: #ffffff;
-            }
-            QGroupBox {
-                background-color: #1c1c24;
-                border: 1px solid #2a2a36;
-                border-radius: 16px;
-                margin-top: 20px;
-                padding-top: 28px;
-                padding-bottom: 16px;
-                padding-left: 20px;
-                padding-right: 20px;
-                font-weight: 700;
-                font-size: 14.5px;
-                font-family: 'Segoe UI', 'Microsoft JhengHei UI', sans-serif;
-                color: #8b5cf6;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top left;
-                left: 20px;
-                top: 2px;
-                padding: 0 8px;
-                background-color: #1c1c24;
-                border-radius: 4px;
-            }
-            QLabel {
-                color: #a0a0ab;
-                font-size: 13.5px;
-                font-family: 'Segoe UI', 'Microsoft JhengHei UI', sans-serif;
-                line-height: 1.5;
-            }
-            QSpinBox {
-                background-color: #121217;
-                border: 1px solid #2a2a36;
-                border-radius: 10px;
-                padding: 8px 16px;
-                color: #8b5cf6;
-                font-size: 15px;
-                font-weight: bold;
-            }
-            QSpinBox:focus {
-                border-color: #8b5cf6;
-            }
-            QCheckBox {
-                color: #ffffff;
-                font-size: 14px;
-                font-weight: 600;
-                font-family: 'Segoe UI', 'Microsoft JhengHei UI', sans-serif;
-                spacing: 10px;
-            }
-            QPushButton#TestBtn {
-                background-color: #8b5cf6;
-                color: #ffffff;
-                font-weight: 700;
-                font-size: 13.5px;
-                border: none;
-                border-radius: 10px;
-                padding: 11px 22px;
-            }
-            QPushButton#TestBtn:hover {
-                background-color: #7c3aed;
-            }
-            QPushButton#ConnectGoogleBtn {
-                background-color: #ea4335;
-                color: #ffffff;
-                font-weight: 700;
-                font-size: 13.5px;
-                border: none;
-                border-radius: 10px;
-                padding: 11px 22px;
-            }
-            QPushButton#ConnectGoogleBtn:hover {
-                background-color: #d93025;
-            }
-        """)
-        self.setObjectName("SettingsView")
+        self.setObjectName("SettingsPage")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
-        scroll_area = QScrollArea(self)
-        self._scroll_area = scroll_area
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setStyleSheet("border: none; background: transparent;")
+        self._scroll_area = QScrollArea(self)
+        self._scroll_area.setWidgetResizable(True)
+        self._scroll_area.setFrameShape(QFrame.Shape.NoFrame)
 
-        container_widget = QWidget()
-        container_widget.setStyleSheet("background-color: #121217;")
+        page = QWidget()
+        page.setObjectName("SettingsScrollContent")
+        page_layout = QHBoxLayout(page)
+        page_layout.setContentsMargins(theme.SPACE_6, theme.SPACE_5, theme.SPACE_6, theme.SPACE_5)
+        page_layout.addStretch(1)
 
-        layout = QVBoxLayout(container_widget)
-        layout.setContentsMargins(32, 32, 32, 32)
-        layout.setSpacing(24)
+        self._container = QWidget(page)
+        self._container.setMaximumWidth(theme.SETTINGS_MAX_W)
+        self._container.setMinimumWidth(0)
+        layout = QVBoxLayout(self._container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(theme.SPACE_3)
 
-        # 頂部標題
-        header_box = QVBoxLayout()
-        header_box.setSpacing(6)
+        title = QLabel("設定", self._container)
+        title.setProperty("role", "title")
+        layout.addWidget(title)
 
-        header_lbl = QLabel("⚙️ 系統與喝水提醒設定", container_widget)
-        header_lbl.setStyleSheet("font-size: 22px; font-weight: 800; color: #ffffff;")
-        header_box.addWidget(header_lbl)
-
-        header_sub = QLabel("個人化提醒時間偏好、提醒總開關與 Google Calendar 雲端帳號授權管理", container_widget)
-        header_sub.setStyleSheet("font-size: 13px; color: #a0a0ab;")
-        header_box.addWidget(header_sub)
-
-        layout.addLayout(header_box)
-
-        # ----------------------------------------------------
-        # 1. 喝水提醒設定卡片
-        # ----------------------------------------------------
-        water_group = QGroupBox("💧 喝水定時提醒偏好", container_widget)
-        self._water_group = water_group
-        w_layout = QVBoxLayout(water_group)
-        w_layout.setContentsMargins(24, 20, 24, 20)
-        w_layout.setSpacing(18)
-
-        self.chk_water_enabled = QCheckBox("啟用喝水定時提醒通知 (Enable Drink Water Reminders)", water_group)
+        # ---- 喝水提醒 ----
+        self.chk_water_enabled = _make_switch(self._container)
         self.chk_water_enabled.setChecked(True)
         self.chk_water_enabled.toggled.connect(self.on_water_enabled_toggled)
-        w_layout.addWidget(self.chk_water_enabled)
 
-        interval_row = QHBoxLayout()
-        interval_lbl = QLabel("提醒時間間隔 (分鐘)：", water_group)
-        interval_lbl.setStyleSheet("color: #ffffff; font-weight: 600;")
-        interval_row.addWidget(interval_lbl)
-
-        self.spin_interval = QSpinBox(water_group)
-        self.spin_interval.setRange(1, 180)
+        self.spin_interval = QSpinBox(self._container)
+        self.spin_interval.setRange(*WATER_INTERVAL_RANGE)
         self.spin_interval.setValue(10)
         self.spin_interval.setSuffix(" 分鐘")
-        self.spin_interval.setFixedWidth(150)
-        interval_row.addWidget(self.spin_interval)
-        interval_row.addStretch(1)
+        self.spin_interval.setMinimumWidth(theme.SETTINGS_CONTROL_W)
 
-        w_layout.addLayout(interval_row)
+        self.test_btn = QPushButton("測試", self._container)
+        self.test_btn.setProperty("variant", "secondary")
+        self.test_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.test_btn.clicked.connect(self.on_test_toast)
 
-        desc_lbl = QLabel("💡 說明：小助理於背景倒數，每隔設定時間在螢幕右下角跳出 3 秒淡出彈窗提醒。", water_group)
-        desc_lbl.setStyleSheet("color: #a0a0ab; font-size: 12.5px; padding-left: 2px;")
-        w_layout.addWidget(desc_lbl)
+        self._water_group, self._water_section = self._add_section(layout, "喝水提醒", [
+            SettingsRow("啟用喝水提醒", "定時在螢幕右下角跳出提醒", self.chk_water_enabled),
+            SettingsRow("提醒間隔", "每隔多久提醒一次", self.spin_interval),
+            SettingsRow("測試提醒", "立即跳出一則提醒，確認外觀與音效", self.test_btn),
+        ])
 
-        test_row = QHBoxLayout()
-        test_btn = QPushButton("🔔 立即測試右下角提醒彈窗 (3秒淡出)", water_group)
-        test_btn.setObjectName("TestBtn")
-        test_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        test_btn.clicked.connect(self.on_test_toast)
-        test_row.addWidget(test_btn)
-        test_row.addStretch(1)
-        w_layout.addLayout(test_row)
-
-        layout.addWidget(water_group)
-
-        # ----------------------------------------------------
-        # 2. Windows 開機自啟動與系統設定卡片
-        # ----------------------------------------------------
-        system_group = QGroupBox("🚀 Windows 系統自動啟動偏好", container_widget)
-        s_layout = QVBoxLayout(system_group)
-        s_layout.setContentsMargins(24, 20, 24, 20)
-        s_layout.setSpacing(14)
-
-        self.chk_autostart = QCheckBox("開機自動啟動 Windows (Start automatically on Windows boot)", system_group)
+        # ---- 一般 ----
+        self.chk_autostart = _make_switch(self._container)
         self.chk_autostart.setChecked(True)
         self.chk_autostart.toggled.connect(self.on_autostart_toggled)
-        s_layout.addWidget(self.chk_autostart)
 
-        s_desc = QLabel("💡 說明：勾選後將寫入 Windows 登錄檔，電腦開機後小助理將自動背景靜默啟動並隱藏於系統工作列圖示。", system_group)
-        s_desc.setStyleSheet("color: #a0a0ab; font-size: 12.5px; padding-left: 2px;")
-        s_layout.addWidget(s_desc)
+        self.chk_minimize_to_tray = _make_switch(self._container)
+        self.chk_minimize_to_tray.setChecked(True)
+        self.chk_minimize_to_tray.toggled.connect(self.on_minimize_to_tray_toggled)
 
-        layout.addWidget(system_group)
+        self._add_section(layout, "一般", [
+            SettingsRow("開機自動啟動", "登入 Windows 後在背景自動啟動", self.chk_autostart),
+            SettingsRow("關閉視窗時縮到系統匣", "按下視窗關閉鈕時保留在系統匣繼續執行",
+                        self.chk_minimize_to_tray),
+        ])
 
-        # ----------------------------------------------------
-        # 3. Google 日曆 API 串接設定卡片
-        # ----------------------------------------------------
-        google_group = QGroupBox("📅 Google Calendar 雲端串接", container_widget)
-        g_layout = QVBoxLayout(google_group)
-        g_layout.setContentsMargins(24, 20, 24, 20)
-        g_layout.setSpacing(18)
+        # ---- Google 日曆 ----
+        self.g_status_lbl = QLabel("檢查連線中…", self._container)
+        self.g_status_lbl.setObjectName("AccountStatus")
+        self.g_status_lbl.setProperty("state", "neutral")
 
-        g_status_row = QHBoxLayout()
-        self.g_status_lbl = QLabel("狀態：⏳ 檢查連線中...", google_group)
-        self.g_status_lbl.setStyleSheet("font-size: 13px;")
-        g_status_row.addWidget(self.g_status_lbl)
-        g_status_row.addStretch(1)
+        self.connect_btn = QPushButton("登入", self._container)
+        self.connect_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.connect_btn.setIconSize(QSize(theme.ICON_SM, theme.ICON_SM))
+        self.connect_btn.clicked.connect(self.on_google_button_clicked)
 
-        self.connect_btn = connect_btn = QPushButton("🔑 登入 Google 帳號串接", google_group)
-        connect_btn.setObjectName("ConnectGoogleBtn")
-        connect_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        connect_btn.clicked.connect(self.on_google_connect)
-        g_status_row.addWidget(connect_btn)
+        self._add_section(layout, "Google 日曆", [
+            SettingsRow("Google 帳號", control=self.connect_btn, desc_widget=self.g_status_lbl),
+        ])
 
-        g_layout.addLayout(g_status_row)
-
-        g_desc = QLabel("💡 說明：登入授權後，系統將自動同步 Google 日曆，並依「色彩標籤」(紅:大30天 / 黃:中7天 / 綠藍:小3天) 進行分類提醒。", google_group)
-        g_desc.setStyleSheet("color: #a0a0ab; font-size: 12.5px; padding-left: 2px;")
-        g_layout.addWidget(g_desc)
-
-        layout.addWidget(google_group)
+        note = QLabel("登入後會同步 Google 日曆的行程；日曆上的顏色標籤會對應為大、中、小三種等級。",
+                      self._container)
+        note.setProperty("role", "muted")
+        note.setWordWrap(True)
+        layout.addWidget(note)
 
         layout.addStretch(1)
+        page_layout.addWidget(self._container, 100)
+        page_layout.addStretch(1)
 
-        scroll_area.setWidget(container_widget)
+        self._scroll_area.setWidget(page)
 
         main_vbox = QVBoxLayout(self)
         main_vbox.setContentsMargins(0, 0, 0, 0)
-        main_vbox.addWidget(scroll_area)
+        main_vbox.addWidget(self._scroll_area)
+
+        self._set_google_button(authenticated=False)
 
         self.event_store.auth_state_changed.connect(self.on_auth_state_changed)
         self.event_store.sync_state_changed.connect(self.on_sync_state_changed)
@@ -235,63 +197,113 @@ class SettingsView(QWidget):
         self.event_store.operation_succeeded.connect(self.on_operation_succeeded)
         # 狀態由 main.py 呼叫 event_store.start() 後的 auth_state_changed 驅動
 
-    def _set_status(self, text, color=None):
+    # ------------------------------------------------------------ Google 狀態
+
+    def _set_status(self, text, state="neutral"):
         self.g_status_lbl.setText(text)
-        if color:
-            self.g_status_lbl.setStyleSheet(f"color: {color}; font-weight: bold;")
+        self.g_status_lbl.setProperty("state", state)
+        repolish(self.g_status_lbl)
+
+    def _set_google_button(self, authenticated, busy=False):
+        """依狀態切換按鈕：未連線 -> 登入（primary）；已連線 -> 登出（secondary）；授權中停用。"""
+        if authenticated:
+            self.connect_btn.setText("登出")
+            self.connect_btn.setProperty("variant", "secondary")
+            self.connect_btn.setIcon(icons.icon("log-out", theme.TEXT_PRIMARY, theme.ICON_SM))
         else:
-            self.g_status_lbl.setStyleSheet("font-size: 13px;")
+            self.connect_btn.setText("登入")
+            self.connect_btn.setProperty("variant", "primary")
+            self.connect_btn.setIcon(icons.icon("log-in", theme.TEXT_ON_ACCENT, theme.ICON_SM))
+        self.connect_btn.setEnabled(not busy)
+        repolish(self.connect_btn)
 
     def _show_unauthorized(self):
-        self._set_status("狀態：🔴 尚未授權 (點擊右側按鈕開啟 Google OAuth2 授權)", "#f43f5e")
+        self._set_status("未連線", "neutral")
+        self._set_google_button(authenticated=False)
+
+    def _show_connected(self):
+        self._set_status("已連線，雲端同步運作中", "ok")
+        self._set_google_button(authenticated=True)
+
+    def _show_authorizing(self):
+        self._set_status("等待瀏覽器授權（最多 3 分鐘）…", "neutral")
+        self._set_google_button(authenticated=False, busy=True)
 
     def on_auth_state_changed(self, authenticated):
         if self.event_store.is_authorizing:
             return  # 授權進行中維持「等待瀏覽器授權」
         if authenticated:
-            self._set_status("狀態：🟢 已成功連線 Google 日曆 (雲端同步運作中)", "#10b981")
-            self.connect_btn.setEnabled(True)
+            self._auth_failed = False
+            self._show_connected()
+        elif self._auth_failed:
+            self._set_google_button(authenticated=False)  # 保留「授權失敗」文字
         else:
             self._show_unauthorized()
-            if not self.event_store.is_authorizing:
-                self.connect_btn.setEnabled(True)
 
     def on_operation_succeeded(self, action):
         if action == "auth":
             QMessageBox.information(
                 self,
                 "Google 授權成功",
-                "🎉 已成功連線至您的 Google 日曆！\n已同步雲端行程，並自動依色彩標籤 (紅:大30天 / 黃:中7天 / 綠藍:小3天) 進行分類提醒。"
+                "已成功連線至你的 Google 日曆。\n行程將自動同步，並依色彩標籤分類為大、中、小等級。"
             )
 
     def on_sync_state_changed(self, state, message):
         if state == "authorizing":
-            self._set_status("狀態：⏳ 等待瀏覽器授權（最多 3 分鐘）...", "#f59e0b")
-            self.connect_btn.setEnabled(False)
+            self._show_authorizing()
         elif self.event_store.is_authorizing:
             return  # 授權進行中不覆寫「等待瀏覽器授權」狀態文字
         elif state == "offline":
-            self._set_status("狀態：🟠 無法連線（離線或逾時）", "#f59e0b")
+            self._set_status("無法連線（離線或逾時）", "error")
         elif state == "ok" and self.event_store.is_authenticated:
-            self._set_status("狀態：🟢 已成功連線 Google 日曆 (雲端同步運作中)", "#10b981")
+            self._show_connected()
 
     def on_operation_failed(self, action, message):
         """授權失敗的提示由 main.py 統一處理；這裡只恢復按鈕與狀態文字。"""
         if action == "auth":
-            self.connect_btn.setEnabled(True)
             if self.event_store.is_authenticated:
-                self._set_status("狀態：🟢 已成功連線 Google 日曆 (雲端同步運作中)", "#10b981")
+                self._auth_failed = False
+                self._show_connected()
             else:
+                self._auth_failed = True
                 self._show_unauthorized()
+                self._set_status("授權失敗，請重新登入", "error")
+
+    def on_google_button_clicked(self):
+        if self.event_store.is_authenticated:
+            self.on_google_logout()
+        else:
+            self.on_google_connect()
+
+    def on_google_connect(self):
+        self._auth_failed = False
+        self.event_store.authorize()
+
+    def _confirm_logout(self):
+        dlg = ConfirmDialog(
+            window_title="登出 Google 帳號",
+            heading="登出 Google 帳號？",
+            message="登出後會停止同步 Google 日曆。",
+            detail="本機的授權資料會被刪除、畫面上的行程會清空，需要重新登入才能再次同步。",
+            confirm_text="登出",
+            parent=self,
+        )
+        return dlg.exec() == ConfirmDialog.DialogCode.Accepted
+
+    def on_google_logout(self):
+        if self._confirm_logout():
+            self.event_store.logout()
+
+    # ------------------------------------------------------------ 其他設定
 
     def scroll_to_water(self):
         """捲動到喝水提醒區塊（供導覽列喝水按鈕使用）。"""
-        group = getattr(self, "_water_group", None)
         scroll = getattr(self, "_scroll_area", None)
-        if group is None or scroll is None:
+        section = getattr(self, "_water_section", None)
+        if section is None or scroll is None:
             logger.debug("scroll_to_water: 設定頁尚未建立喝水區塊，略過")
             return
-        scroll.ensureWidgetVisible(group, 0, 0)
+        scroll.ensureWidgetVisible(section, 0, 0)
 
     def on_water_enabled_toggled(self, checked):
         self.spin_interval.setEnabled(checked)
@@ -300,15 +312,9 @@ class SettingsView(QWidget):
     def on_autostart_toggled(self, checked):
         self.autostart_signal.emit(checked)
 
-    def on_test_toast(self):
-        interval = self.spin_interval.value()
-        self.test_toast = ToastWindow(
-            title="喝水提醒 (測試模式) 💧",
-            message=f"這是提醒視窗測試！當前設定每 {interval} 分鐘提醒一次。",
-            display_time_ms=3000,
-            fade_time_ms=800
-        )
-        self.test_toast.show()
+    def on_minimize_to_tray_toggled(self, checked):
+        self.minimize_to_tray_signal.emit(checked)
 
-    def on_google_connect(self):
-        self.event_store.authorize()
+    def on_test_toast(self):
+        """測試提醒由 main.py 負責顯示（與實際喝水提醒相同），這裡只發出請求。"""
+        self.test_toast_requested.emit()

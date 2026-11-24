@@ -116,3 +116,72 @@ def test_roundtrip_timed_utc_produces_no_patch(dialog_cls):
         "start": {"dateTime": "2026-03-10T01:00:00Z"},
         "end": {"dateTime": "2026-03-10T02:00:00Z"},
     })
+
+
+def test_delete_button_hidden_in_new_mode_and_shown_in_edit(dialog_cls):
+    new_dlg = dialog_cls()
+    assert new_dlg.delete_btn.isHidden()
+    edit_dlg = dialog_cls(event_data=_timed_event())
+    assert not edit_dlg.delete_btn.isHidden()
+    assert edit_dlg.delete_btn.property("variant") == "danger"
+
+
+def test_window_title_new_and_edit(dialog_cls):
+    assert dialog_cls().windowTitle() == "新增行程"
+    assert dialog_cls(event_data=_timed_event()).windowTitle() == "編輯行程"
+
+
+def test_all_day_toggle_hides_time_fields(dialog_cls):
+    dlg = dialog_cls()
+    assert not dlg.start_time.isHidden() and not dlg.end_time.isHidden()
+    dlg.all_day_chk.setChecked(True)
+    assert dlg.start_time.isHidden() and dlg.end_time.isHidden()
+    dlg.all_day_chk.setChecked(False)
+    assert not dlg.start_time.isHidden() and not dlg.end_time.isHidden()
+
+
+def test_all_day_switch_variant(dialog_cls):
+    assert dialog_cls().all_day_chk.property("variant") == "switch"
+
+
+def test_priority_combo_current_data(dialog_cls):
+    assert dialog_cls().priority_combo.currentData() == "medium"
+    assert dialog_cls(event_data=_all_day_event()).priority_combo.currentData() == "major"
+    assert dialog_cls(event_data=_timed_event()).priority_combo.currentData() == "minor"
+    dlg = dialog_cls()
+    combo = dlg.priority_combo
+    assert [combo.itemData(i) for i in range(combo.count())] == ["major", "medium", "minor"]
+    assert all(not combo.itemIcon(i).isNull() for i in range(combo.count()))
+
+
+def test_delete_confirm_sets_is_delete(dialog_cls, monkeypatch):
+    from PyQt6.QtWidgets import QDialog
+    import ui.calendar_dialog as mod
+    monkeypatch.setattr(mod.ConfirmDeleteDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
+    dlg = dialog_cls(event_data=_timed_event())
+    dlg.on_delete_clicked()
+    assert dlg.is_delete is True
+    assert dlg.result() == 2
+
+
+def test_delete_confirm_cancel_keeps_dialog(dialog_cls, monkeypatch):
+    from PyQt6.QtWidgets import QDialog
+    import ui.calendar_dialog as mod
+    monkeypatch.setattr(mod.ConfirmDeleteDialog, "exec", lambda self: QDialog.DialogCode.Rejected)
+    dlg = dialog_cls(event_data=_timed_event())
+    dlg.on_delete_clicked()
+    assert dlg.is_delete is False
+
+
+def test_confirm_delete_dialog_buttons(qapp):
+    from ui.calendar_dialog import ConfirmDeleteDialog
+    dlg = ConfirmDeleteDialog("開會")
+    assert dlg.cancel_btn.property("variant") == "secondary"
+    assert dlg.confirm_btn.property("variant") == "danger"
+
+
+def test_date_button_uses_chinese_weekday(dialog_cls):
+    dlg = dialog_cls(default_date=QDate(2026, 11, 25))
+    assert dlg.start_date_btn.text() == "2026/11/25 週三"
+    dlg.start_date_btn.setDate(QDate(2026, 11, 29))
+    assert dlg.start_date_btn.text() == "2026/11/29 週日"

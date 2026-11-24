@@ -8,8 +8,8 @@ Secretary 智能桌面小助理 - 主程式入口 (Application Entry Point)
 import sys
 import os
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox
-from PyQt6.QtGui import QIcon, QAction, QPixmap, QColor, QPainter
+from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMessageBox
+from PyQt6.QtGui import QIcon
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
 from utils.logger import get_logger
@@ -22,39 +22,32 @@ try:
 except Exception as _e:
     logger.exception("初始化 data/ 目錄或搬移舊檔失敗，繼續執行")
 
-from utils.config_manager import ConfigManager
+from utils.config_manager import ConfigManager, save_config_or_warn
 from utils.autostart import AutoStartManager
 from services.event_store import EventStore
+from ui import icons, theme
 from ui.main_window import MainWindow
-from ui.toast_window import ToastWindow
+from ui.styles import apply_app_style
+from ui.toast_window import ToastStack, ToastWindow
+from ui.tray_menu import build_tray_menu
+from utils.water_timer import WaterCountdown
 
 SINGLE_INSTANCE_SOCKET = "SecretaryApp_SingleInstance_Lock_haolun588"
+
+WATER_SNOOZE_MINUTES = 10
 
 def get_app_icon():
     icon_path = asset_path("icon.png")
     if os.path.exists(icon_path):
         return QIcon(icon_path)
 
-    pixmap = QPixmap(32, 32)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setBrush(QColor("#8b5cf6"))
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.drawEllipse(2, 2, 28, 28)
-    painter.setPen(QColor("#ffffff"))
-    font = painter.font()
-    font.setPixelSize(18)
-    font.setBold(True)
-    painter.setFont(font)
-    painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "⚡")
-    painter.end()
-    return QIcon(pixmap)
+    return QIcon(icons.pixmap("logo", theme.ACCENT, theme.APP_ICON))
 
 class SecretaryApp:
     def __init__(self, sys_argv):
         self.app = QApplication(sys_argv)
         self.app.setQuitOnLastWindowClosed(False)
+        apply_app_style(self.app)
 
         self.app_icon = get_app_icon()
         self.app.setWindowIcon(self.app_icon)
@@ -65,14 +58,15 @@ class SecretaryApp:
         # 狀態控制變數
         self.water_enabled = self.config.get("water_enabled", True)
         self.autostart_enabled = self.config.get("autostart", True)
+        self.minimize_to_tray = self.config.get("minimize_to_tray", True)
         self.interval_minutes = self.config.get("interval_minutes", 10)
-        self.remaining_seconds = self.interval_minutes * 60
+        self.water = WaterCountdown(self.interval_minutes, enabled=self.water_enabled)
 
         # 開機自啟動登錄檔同步
         AutoStartManager.set_autostart(self.autostart_enabled)
 
         # 維護作用中的 Toast 物件引用清單，防記憶體垃圾回收崩潰
-        self.active_toasts = []
+        self.toast_stack = ToastStack()
 
         # 行程資料唯一來源；以 app 為 parent，並注入各 view
         self.event_store = EventStore(parent=self.app)
@@ -86,6 +80,7 @@ class SecretaryApp:
         # 設定頁面初始化狀態
         self.window.settings_view.chk_water_enabled.setChecked(self.water_enabled)
         self.window.settings_view.chk_autostart.setChecked(self.autostart_enabled)
+        self.window.settings_view.chk_minimize_to_tray.setChecked(self.minimize_to_tray)
         self.window.settings_view.spin_interval.setValue(self.interval_minutes)
 
         # 實時 1 秒背景倒數計時器
@@ -99,6 +94,8 @@ class SecretaryApp:
         # 連接設定訊號
         self.window.settings_view.water_enabled_signal.connect(self.on_water_enabled_toggled)
         self.window.settings_view.autostart_signal.connect(self.on_autostart_toggled)
+        self.window.settings_view.minimize_to_tray_signal.connect(self.on_minimize_to_tray_toggled)
+        self.window.settings_view.test_toast_requested.connect(self.trigger_water_toast)
         self.window.settings_view.spin_interval.valueChanged.connect(self.on_interval_changed)
 
     def init_single_instance_server(self):
@@ -127,77 +124,50 @@ class SecretaryApp:
         self.tray_icon = QSystemTrayIcon(self.app_icon, self.app)
         self.tray_icon.setToolTip("Secretary 智能桌面小助理 (背景運作中)")
 
-        tray_menu = QMenu()
-        tray_menu.setStyleSheet("""
-            QMenu {
-                background-color: #1c1c24;
-                color: #ffffff;
-                border: 1px solid #2a2a36;
-                border-radius: 8px;
-                padding: 4px;
-                font-family: 'Segoe UI', 'Microsoft JhengHei UI', sans-serif;
-            }
-            QMenu::item {
-                padding: 8px 20px;
-                border-radius: 6px;
-                font-size: 13px;
-            }
-            QMenu::item:selected {
-                background-color: #8b5cf6;
-                color: #ffffff;
-            }
-        """)
-
-        show_action = QAction("🖥️ 顯示小助理主視窗", self.app)
-        show_action.triggered.connect(self.show_main_window)
-        tray_menu.addAction(show_action)
-
-        test_toast_action = QAction("💧 測試喝水提醒彈窗", self.app)
-        test_toast_action.triggered.connect(self.trigger_water_toast)
-        tray_menu.addAction(test_toast_action)
-
-        settings_action = QAction("⚙️ 系統與提醒設定", self.app)
-        settings_action.triggered.connect(self.show_settings_page)
-        tray_menu.addAction(settings_action)
-
-        tray_menu.addSeparator()
-
-        quit_action = QAction("❌ 退出程式", self.app)
-        quit_action.triggered.connect(self.quit_app)
-        tray_menu.addAction(quit_action)
+        tray_menu = build_tray_menu({
+            "show": self.show_main_window,
+            "test_water": self.trigger_water_toast,
+            "settings": self.show_settings_page,
+            "quit": self.quit_app,
+        })
+        self.tray_menu = tray_menu  # 持有引用，避免被回收
 
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.activated.connect(self.on_tray_icon_activated)
         self.tray_icon.show()
 
     def on_second_tick(self):
-        """每秒觸發倒數計時與 UI 左下角實時文字更新"""
-        if not self.water_enabled:
-            self.window.sidebar.update_countdown("提醒狀態: 已關閉", is_enabled=False)
+        """每秒觸發倒數計時與左側導覽列倒數更新"""
+        if not self.water.enabled:
+            self.window.sidebar.set_countdown(None)
             return
 
-        self.remaining_seconds -= 1
-
-        if self.remaining_seconds <= 0:
+        if self.water.tick():
             self.trigger_water_toast()
-            self.remaining_seconds = self.interval_minutes * 60
 
-        m = self.remaining_seconds // 60
-        s = self.remaining_seconds % 60
-        self.window.sidebar.update_countdown(f"下次提醒: {m:02d}:{s:02d} 後", is_enabled=True)
+        self.window.sidebar.set_countdown(self.water.remaining)
+
+    def show_toast(self, **kwargs):
+        """建立並顯示 toast；多個同時存在時由 ToastStack 往上堆疊。"""
+        toast = ToastWindow(**kwargs)
+        self.toast_stack.add(toast)
+        toast.show()
+        return toast
 
     def trigger_water_toast(self):
-        """安全跳出右下角 3 秒淡出提醒彈窗"""
+        """安全跳出右下角喝水提醒（可延後或標記已喝）"""
         try:
-            toast = ToastWindow(
-                title="喝水時間到了 💧",
-                message="長時間坐在電腦前，記得喝杯水、伸展一下身體喔！",
+            self.show_toast(
+                title="該喝水了",
+                message="久坐一段時間了，起來喝杯水、活動一下吧。",
                 display_time_ms=3000,
-                fade_time_ms=800
+                fade_time_ms=800,
+                kind="water",
+                actions=[
+                    (f"延後 {WATER_SNOOZE_MINUTES} 分鐘", lambda: self.water.snooze(WATER_SNOOZE_MINUTES)),
+                    ("已喝", self.water.reset),
+                ],
             )
-            self.active_toasts.append(toast)
-            toast.destroyed.connect(lambda obj, t=toast: self.cleanup_toast(t))
-            toast.show()
         except Exception as e:
             logger.exception("觸發提醒彈窗異常")
 
@@ -208,15 +178,13 @@ class SecretaryApp:
                 return
             self._last_fetch_error = message
         try:
-            toast = ToastWindow(
-                title="同步失敗 ⚠️",
+            self.show_toast(
+                title="同步失敗",
                 message=message,
                 display_time_ms=4000,
-                fade_time_ms=800
+                fade_time_ms=800,
+                kind="danger",
             )
-            self.active_toasts.append(toast)
-            toast.destroyed.connect(lambda obj, t=toast: self.cleanup_toast(t))
-            toast.show()
         except Exception:
             logger.exception("顯示同步失敗提示異常")
 
@@ -231,28 +199,39 @@ class SecretaryApp:
         if state == "ok":
             self._last_fetch_error = None
 
-    def cleanup_toast(self, toast_instance):
-        if toast_instance in self.active_toasts:
-            self.active_toasts.remove(toast_instance)
+    def _notify_danger(self, title, message):
+        try:
+            self.show_toast(title=title, message=message, display_time_ms=4000,
+                            fade_time_ms=800, kind="danger")
+        except Exception:
+            logger.exception("顯示設定儲存失敗提示異常")
+
+    def save_config(self):
+        """寫入設定檔；失敗時以 danger toast 提示使用者（不可只記 log）。"""
+        return save_config_or_warn(self.config, ConfigManager.save_config, self._notify_danger)
 
     def on_water_enabled_toggled(self, enabled):
         self.water_enabled = enabled
+        self.water.set_enabled(enabled)
         self.config["water_enabled"] = enabled
-        ConfigManager.save_config(self.config)
-        if enabled:
-            self.remaining_seconds = self.interval_minutes * 60
+        self.save_config()
 
     def on_autostart_toggled(self, enabled):
         self.autostart_enabled = enabled
         self.config["autostart"] = enabled
-        ConfigManager.save_config(self.config)
+        self.save_config()
         AutoStartManager.set_autostart(enabled)
+
+    def on_minimize_to_tray_toggled(self, enabled):
+        self.minimize_to_tray = enabled
+        self.config["minimize_to_tray"] = enabled
+        self.save_config()
 
     def on_interval_changed(self, minutes):
         self.interval_minutes = minutes
-        self.remaining_seconds = minutes * 60
+        self.water.set_interval(minutes)
         self.config["interval_minutes"] = minutes
-        ConfigManager.save_config(self.config)
+        self.save_config()
 
     def show_main_window(self):
         self.window.show()

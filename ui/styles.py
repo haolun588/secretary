@@ -141,11 +141,12 @@ QPushButton[variant="danger"] {
 QPushButton[variant="danger"]:hover { background: {DANGER_HOVER}; border-color: {DANGER_HOVER}; }
 QPushButton[variant="danger"]:disabled { background: {DANGER_MUTED}; border-color: transparent; color: {TEXT_MUTED}; }
 QPushButton[variant="danger"][soft="true"] {
-    background: {DANGER_MUTED};
+    background: transparent;
     border: 1px solid transparent;
     color: {DANGER};
 }
-QPushButton[variant="danger"][soft="true"]:hover { border-color: {DANGER}; }
+QPushButton[variant="danger"][soft="true"]:hover { background: {DANGER_MUTED}; }
+QPushButton[variant="danger"][soft="true"]:pressed { background: {DANGER_MUTED}; }
 
 QToolButton {
     background: transparent;
@@ -394,6 +395,7 @@ QDialog { background: {SURFACE_1}; }
 QMessageBox { background: {SURFACE_1}; }
 QMessageBox QLabel { color: {TEXT_PRIMARY}; font-size: {FONT_SM}px; }
 QDialog QLabel[role="field"] { color: {TEXT_SECONDARY}; font-size: {FONT_XS}px; }
+QDialog#DatePopup { background: {SURFACE_2}; border: 1px solid {BORDER_STRONG}; }
 QFrame#DialogFooter { background: transparent; border: none; border-top: 1px solid {BORDER}; }
 QPushButton#DatePopupButton { text-align: left; font-weight: {WEIGHT_REGULAR}; background: {SURFACE_2}; border: 1px solid {BORDER}; }
 QPushButton#DatePopupButton:hover { border-color: {BORDER_STRONG}; }
@@ -410,6 +412,7 @@ QFrame#SettingsRow { background: transparent; border: none; border-bottom: 1px s
 QFrame#SettingsRow[last="true"] { border-bottom: none; }
 QLabel#SettingsRowTitle { font-size: {FONT_SM}px; font-weight: {WEIGHT_SEMIBOLD}; }
 QLabel#SettingsRowDesc { font-size: {FONT_XS}px; color: {TEXT_SECONDARY}; }
+QLabel#AccountStatus { font-size: {FONT_XS}px; color: {TEXT_SECONDARY}; }
 QLabel#AccountStatus[state="ok"] { color: {SUCCESS}; }
 QLabel#AccountStatus[state="error"] { color: {DANGER}; }
 """
