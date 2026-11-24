@@ -7,8 +7,8 @@ pytest.importorskip("PyQt6.QtWidgets")
 from PyQt6.QtWidgets import QApplication  # noqa: E402
 
 from ui import theme  # noqa: E402
-from ui.components import (IconButton, SegmentedControl, SyncStatusBadge, level_color,  # noqa: E402
-                           sync_state_presentation)
+from ui.components import (IconButton, SegmentedControl, SyncStatusBadge, level_bg,  # noqa: E402
+                           level_color, level_text, sync_state_presentation)
 
 
 @pytest.fixture(scope="module")
@@ -38,6 +38,16 @@ def test_sync_state_presentation_unknown_falls_back_to_idle():
 def test_level_color():
     assert level_color("major") == theme.PRIORITY["major"]
     assert level_color("unknown") == theme.PRIORITY["medium"]
+
+
+def test_level_bg_and_text_fallback():
+    assert level_bg("major") == theme.PRIORITY_BG["major"]
+    assert level_bg("major", hovered=True) == theme.PRIORITY_BG_HOVER["major"]
+    assert level_bg("unknown") == theme.PRIORITY_BG["medium"]
+    assert level_bg(None, hovered=True) == theme.PRIORITY_BG_HOVER["medium"]
+    assert level_text("minor") == theme.PRIORITY_TEXT["minor"]
+    assert level_text("unknown") == theme.PRIORITY_TEXT["medium"]
+    assert level_text(None) == theme.PRIORITY_TEXT["medium"]
 
 
 def test_segmented_changed_signal(qapp):

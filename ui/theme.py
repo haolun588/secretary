@@ -27,39 +27,47 @@ ui/theme.py
 import re
 
 # 背景與表面
-BG = "#0f0f14"
-SURFACE_1 = "#16161d"
-SURFACE_2 = "#1d1d26"
-SURFACE_3 = "#262631"
+BG = "#0d1322"
+SURFACE_1 = "#121a2e"
+SURFACE_2 = "#172138"
+SURFACE_3 = "#1f2a44"
 
 # 邊框
-BORDER = "#2a2a35"
-BORDER_STRONG = "#3a3a48"
+BORDER = "#222d47"
+BORDER_STRONG = "#2f3c5c"
 
 # 文字
-TEXT_PRIMARY = "#ececf1"
-TEXT_SECONDARY = "#a1a1ae"
-TEXT_MUTED = "#6b6b78"
+TEXT_PRIMARY = "#e8eefc"
+TEXT_SECONDARY = "#a3b0cc"
+TEXT_MUTED = "#6b7894"
 
 # 主色
-ACCENT = "#8b7cf6"
-ACCENT_HOVER = "#7a6aef"
-ACCENT_MUTED = "rgba(139,124,246,0.14)"
-ACCENT_SOFT = "rgba(139,124,246,0.08)"
-TEXT_ON_ACCENT = "#ffffff"
+ACCENT = "#2dd4bf"
+ACCENT_HOVER = "#22b8a6"
+ACCENT_MUTED = "rgba(45,212,191,0.16)"
+ACCENT_SOFT = "rgba(45,212,191,0.08)"
+TEXT_ON_ACCENT = "#04201c"  # 青綠底配深字
 
 # 互動狀態疊色
 HOVER = "rgba(255,255,255,0.04)"
 PRESSED = "rgba(255,255,255,0.07)"
-DANGER_MUTED = "rgba(229,72,77,0.14)"
+DANGER_MUTED = "rgba(244,63,94,0.14)"
 OVERLAY = "rgba(0,0,0,0.45)"
 
 # 語意色
-DANGER = "#e5484d"
-DANGER_HOVER = "#cd3a3f"
-SUCCESS = "#30a46c"
-WARNING = "#f5a524"
-PRIORITY = {"major": DANGER, "medium": WARNING, "minor": SUCCESS}
+DANGER = "#f43f5e"
+DANGER_HOVER = "#e11d48"
+TEXT_ON_DANGER = "#ffffff"
+SUCCESS = "#3fb950"
+WARNING = "#fbbf24"
+
+# 行程等級色（與語意色脫鉤）：色條 / 色點用 PRIORITY，整格底色與文字用 BG / TEXT
+PRIORITY = {"major": "#fb7185", "medium": "#fbbf24", "minor": "#60a5fa"}
+PRIORITY_BG = {"major": "rgba(251,113,133,0.18)", "medium": "rgba(251,191,36,0.16)",
+               "minor": "rgba(96,165,250,0.18)"}
+PRIORITY_BG_HOVER = {"major": "rgba(251,113,133,0.30)", "medium": "rgba(251,191,36,0.28)",
+                     "minor": "rgba(96,165,250,0.30)"}
+PRIORITY_TEXT = {"major": "#ffd1d8", "medium": "#ffe7a3", "minor": "#d4e6ff"}
 
 # 字型
 FONT_FAMILY = "'Segoe UI', 'Microsoft JhengHei UI', sans-serif"

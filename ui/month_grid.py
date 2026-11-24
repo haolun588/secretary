@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import QSizePolicy, QToolTip, QWidget
 
 from ui import calendar_logic as cl
 from ui import theme
-from ui.components import level_color
+from ui.components import level_bg, level_color, level_text
 from ui.styles import fit_text, make_font, qcolor
 from utils.logger import get_logger
 
@@ -293,13 +293,14 @@ class MonthGrid(QWidget):
         path = QPainterPath()
         path.addRoundedRect(QRectF(rect), theme.RADIUS_SM, theme.RADIUS_SM)
         p.setClipPath(path)
-        p.fillRect(rect, qcolor(theme.SURFACE_3 if hovered else theme.SURFACE_2))
+        p.fillRect(rect, qcolor(theme.SURFACE_2))      # 不透明底，避免半透明疊色透出格線
+        p.fillRect(rect, qcolor(level_bg(evt.get("priority"), hovered)))
         bar = QRect(rect.left(), rect.top(), theme.LEVEL_BAR, rect.height())
         p.fillRect(bar, qcolor(level_color(evt.get("priority"))))
         p.setClipping(False)
         font = make_font(theme.FONT_XS, theme.WEIGHT_REGULAR)
         p.setFont(font)
-        p.setPen(qcolor(theme.TEXT_PRIMARY))
+        p.setPen(qcolor(level_text(evt.get("priority"))))
         text_rect = rect.adjusted(theme.LEVEL_BAR + theme.SPACE_1, 0, -theme.SPACE_1, 0)
         title = str(evt.get("title") or "（無標題）")
         elided = fit_text(QFontMetrics(font), title, text_rect.width())

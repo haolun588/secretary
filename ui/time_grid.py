@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import QFrame, QScrollArea, QSizePolicy, QToolTip, QVBoxLay
 
 from ui import calendar_logic as cl
 from ui import theme
-from ui.components import level_color
+from ui.components import level_bg, level_color, level_text
 from ui.styles import fit_text, make_font, qcolor
 from utils.logger import get_logger
 
@@ -305,7 +305,8 @@ class _HourCanvas(_GridBase):
         path = QPainterPath()
         path.addRoundedRect(QRectF(rect), theme.RADIUS_SM, theme.RADIUS_SM)
         p.setClipPath(path)
-        p.fillRect(rect, qcolor(theme.BORDER_STRONG if hovered else theme.SURFACE_3))
+        p.fillRect(rect, qcolor(theme.SURFACE_2))      # 不透明底，避免重疊行程與格線透出
+        p.fillRect(rect, qcolor(level_bg(evt.get("priority"), hovered)))
         p.fillRect(QRect(rect.left(), rect.top(), theme.LEVEL_BAR, rect.height()),
                    qcolor(level_color(evt.get("priority"))))
         p.setClipping(False)
@@ -313,7 +314,7 @@ class _HourCanvas(_GridBase):
         title_font = make_font(theme.FONT_XS, theme.WEIGHT_SEMIBOLD)
         fm = QFontMetrics(title_font)
         p.setFont(title_font)
-        p.setPen(qcolor(theme.TEXT_PRIMARY))
+        p.setPen(qcolor(level_text(evt.get("priority"))))
         title = str(evt.get("title") or "（無標題）")
         line_h = fm.height()
         p.setClipRect(text_rect)      # 窄欄時標題只剩前幾個字也直接裁切顯示
@@ -386,13 +387,14 @@ def _paint_chip(p, rect, evt, hovered):
     path = QPainterPath()
     path.addRoundedRect(QRectF(rect), theme.RADIUS_SM, theme.RADIUS_SM)
     p.setClipPath(path)
-    p.fillRect(rect, qcolor(theme.SURFACE_3 if hovered else theme.SURFACE_2))
+    p.fillRect(rect, qcolor(theme.SURFACE_2))      # 不透明底，避免半透明疊色透出格線
+    p.fillRect(rect, qcolor(level_bg(evt.get("priority"), hovered)))
     p.fillRect(QRect(rect.left(), rect.top(), theme.LEVEL_BAR, rect.height()),
                qcolor(level_color(evt.get("priority"))))
     p.setClipping(False)
     font = make_font(theme.FONT_XS, theme.WEIGHT_REGULAR)
     p.setFont(font)
-    p.setPen(qcolor(theme.TEXT_PRIMARY))
+    p.setPen(qcolor(level_text(evt.get("priority"))))
     text_rect = rect.adjusted(theme.LEVEL_BAR + theme.SPACE_1, 0, -theme.SPACE_1, 0)
     p.setClipRect(text_rect)
     p.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,

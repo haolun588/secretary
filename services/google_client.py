@@ -20,6 +20,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow, WSGITimeoutError
 from googleapiclient.discovery import build
 
+from ui import theme
 from utils.logger import get_logger
 from utils.paths import CREDENTIALS_PATH, TOKEN_PATH
 
@@ -32,9 +33,10 @@ CALENDAR_ID = "primary"
 OAUTH_PORT = 8080
 
 _SUCCESS_MESSAGE = (
-    '<h1 style="color:#8b5cf6;text-align:center;font-family:sans-serif;margin-top:50px;">'
+    f'<style>html,body{{background:{theme.BG};}}</style>'
+    f'<h1 style="color:{theme.ACCENT};text-align:center;font-family:sans-serif;margin-top:50px;">'
     "授權成功！</h1>"
-    '<p style="text-align:center;color:#666;">'
+    f'<p style="text-align:center;color:{theme.TEXT_SECONDARY};">'
     "您現在可以關閉此瀏覽器分頁，並回到 Secretary 桌面小助理。</p>"
 )
 

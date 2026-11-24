@@ -37,6 +37,17 @@ def level_color(priority):
     return theme.PRIORITY.get(priority, theme.PRIORITY[_DEFAULT_PRIORITY])
 
 
+def level_bg(priority, hovered=False):
+    """行程格子整格底色（半透明 rgba）；未知等級視為 medium。"""
+    table = theme.PRIORITY_BG_HOVER if hovered else theme.PRIORITY_BG
+    return table.get(priority, table[_DEFAULT_PRIORITY])
+
+
+def level_text(priority):
+    """行程格子文字色；未知等級視為 medium。"""
+    return theme.PRIORITY_TEXT.get(priority, theme.PRIORITY_TEXT[_DEFAULT_PRIORITY])
+
+
 def sync_state_presentation(state):
     """同步狀態 -> (顯示文字, 圖示名稱, tone)；未知狀態退回 idle 的呈現。"""
     return _SYNC_PRESENTATION.get(state, _SYNC_PRESENTATION["idle"])

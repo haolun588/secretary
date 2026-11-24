@@ -4,9 +4,17 @@ scripts/arrow_generator.py
 """
 
 import os
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
 from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QPolygonF
+
+from ui import theme
 
 def generate_arrow_icons():
     assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets")
@@ -22,7 +30,7 @@ def generate_arrow_icons():
     pix_up.fill(Qt.GlobalColor.transparent)
     p_up = QPainter(pix_up)
     p_up.setRenderHint(QPainter.RenderHint.Antialiasing)
-    p_up.setBrush(QColor("#ffffff"))
+    p_up.setBrush(QColor(theme.TEXT_PRIMARY))
     p_up.setPen(Qt.PenStyle.NoPen)
     
     triangle_up = QPolygonF([
@@ -39,7 +47,7 @@ def generate_arrow_icons():
     pix_down.fill(Qt.GlobalColor.transparent)
     p_down = QPainter(pix_down)
     p_down.setRenderHint(QPainter.RenderHint.Antialiasing)
-    p_down.setBrush(QColor("#ffffff"))
+    p_down.setBrush(QColor(theme.TEXT_PRIMARY))
     p_down.setPen(Qt.PenStyle.NoPen)
 
     triangle_down = QPolygonF([

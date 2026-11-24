@@ -136,7 +136,7 @@ QPushButton[variant="ghost"]:pressed { background: {PRESSED}; }
 QPushButton[variant="danger"] {
     background: {DANGER};
     border: 1px solid {DANGER};
-    color: {TEXT_ON_ACCENT};
+    color: {TEXT_ON_DANGER};
 }
 QPushButton[variant="danger"]:hover { background: {DANGER_HOVER}; border-color: {DANGER_HOVER}; }
 QPushButton[variant="danger"]:disabled { background: {DANGER_MUTED}; border-color: transparent; color: {TEXT_MUTED}; }
