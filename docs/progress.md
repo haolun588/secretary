@@ -112,6 +112,8 @@
 - 待驗證：`events.patch` 對 `extendedProperties.private` 的 key 合併行為
 
 ## 📌 日期連動與喝水頁 (2026-11-25 完成；未 commit，未實機驗證)
+- [x] 事件對話框開始/結束連動：`DatePopupButton` 新增 `dateChanged`（僅使用者選日期時發出，`setDate` 不發）；對話框記錄「目前長度」（定時為分鐘、全天為天數），改開始日期/時間時結束跟著移並正確跨日，非 30 分整的結果會插入 combo 選項
+- [x] 結束早於開始時，結束日期鈕與時間 combo 標 `invalid`（紅框，`ui/styles.py`），儲存鈕停用；恢復後清除。切換全天會重算長度並重跑檢查；`accept()` 的 `_validation_error` 保留為最後防線
 - [x] 喝水改為獨立頁面 `ui/water_view.py`（大字倒數＋啟用/間隔/測試）；導覽頁面常數改為 `PAGE_CALENDAR=0`／`PAGE_WATER=1`／`PAGE_SETTINGS=2`，移除 `water_requested`、`on_water_requested`、設定頁喝水區塊與 `scroll_to_water`；`main.py` 改綁 `water_view` 並每秒餵倒數；新增 `theme.FONT_DISPLAY`
 - 測試狀態：`python -m pytest -q`：439 passed。
 - 未實機驗證：對話框連動與紅框在實機的觀感、喝水頁實際畫面、托盤「系統與提醒設定」仍跳到設定頁（程式路徑未變）。

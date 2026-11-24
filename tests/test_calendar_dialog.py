@@ -185,3 +185,163 @@ def test_date_button_uses_chinese_weekday(dialog_cls):
     assert dlg.start_date_btn.text() == "2026/11/25 週三"
     dlg.start_date_btn.setDate(QDate(2026, 11, 29))
     assert dlg.start_date_btn.text() == "2026/11/29 週日"
+
+
+# ---------------------------------------------------------------- 開始/結束連動
+
+def _pick_date(btn, date):
+    """模擬使用者在彈出日曆選日期（setDate 不發訊號，需補發 dateChanged）。"""
+    btn.setDate(date)
+    btn.dateChanged.emit(date)
+
+
+def test_set_date_does_not_emit_date_changed(qapp):
+    from ui.calendar_dialog import DatePopupButton
+    btn = DatePopupButton(QDate(2026, 1, 1))
+    got = []
+    btn.dateChanged.connect(got.append)
+    btn.setDate(QDate(2026, 1, 2))
+    assert got == []
+
+
+def test_start_time_change_moves_end_keeping_duration(dialog_cls):
+    dlg = dialog_cls(default_date=QDate(2026, 5, 6))  # 09:00-10:00，長度 60 分
+    dlg.start_time.setCurrentText("13:30")
+    assert dlg.end_date_btn.date() == QDate(2026, 5, 6)
+    assert dlg.end_time.currentText() == "14:30"
+
+
+def test_start_date_change_moves_end_date(dialog_cls):
+    dlg = dialog_cls(event_data=_timed_event())  # 09:15-10:30，長度 75 分
+    _pick_date(dlg.start_date_btn, QDate(2026, 3, 20))
+    assert dlg.end_date_btn.date() == QDate(2026, 3, 20)
+    assert dlg.end_time.currentText() == "10:30"
+    assert dlg.start_time.currentText() == "09:15"
+
+
+def test_off_grid_end_time_is_inserted(dialog_cls):
+    dlg = dialog_cls(event_data=_timed_event())  # 長度 75 分
+    dlg.start_time.setCurrentText("10:00")
+    assert dlg.end_time.currentText() == "11:15"
+    assert dlg.get_data()["end"] == "2026-03-10T11:15:00"
+
+
+def test_end_rolls_over_to_next_day(dialog_cls):
+    dlg = dialog_cls(default_date=QDate(2026, 5, 6))  # 長度 60 分
+    dlg.start_time.setCurrentText("23:30")
+    assert dlg.end_date_btn.date() == QDate(2026, 5, 7)
+    assert dlg.end_time.currentText() == "00:30"
+    assert dlg._validation_error() is None
+    assert dlg.save_btn.isEnabled()
+
+
+def test_end_change_updates_duration(dialog_cls):
+    dlg = dialog_cls(default_date=QDate(2026, 5, 6))
+    dlg.end_time.setCurrentText("12:00")  # 長度 180 分
+    dlg.start_time.setCurrentText("10:00")
+    assert dlg.end_time.currentText() == "13:00"
+
+
+def test_end_before_start_disables_save_and_marks_invalid(dialog_cls):
+    dlg = dialog_cls(default_date=QDate(2026, 5, 6))
+    dlg.end_time.setCurrentText("08:00")
+    assert not dlg.save_btn.isEnabled()
+    assert dlg.end_time.property("invalid") == "true"
+    assert dlg.end_date_btn.property("invalid") == "true"
+    # 長度維持原值：再改開始時間，結束依舊長度前進並恢復合法
+    dlg.start_time.setCurrentText("07:00")
+    assert dlg.end_time.currentText() == "08:00"
+    assert dlg.save_btn.isEnabled()
+    assert dlg.end_time.property("invalid") == "false"
+    assert dlg.end_date_btn.property("invalid") == "false"
+
+
+def test_invalid_recovers_when_end_fixed(dialog_cls):
+    dlg = dialog_cls(default_date=QDate(2026, 5, 6))
+    _pick_date(dlg.end_date_btn, QDate(2026, 5, 5))
+    assert not dlg.save_btn.isEnabled()
+    _pick_date(dlg.end_date_btn, QDate(2026, 5, 7))
+    assert dlg.save_btn.isEnabled()
+    assert dlg.end_date_btn.property("invalid") == "false"
+
+
+def test_all_day_linkage_keeps_day_span(dialog_cls):
+    dlg = dialog_cls(event_data=_all_day_event())  # 3/10 - 3/12，長度 2 天
+    _pick_date(dlg.start_date_btn, QDate(2026, 3, 31))
+    assert dlg.end_date_btn.date() == QDate(2026, 4, 2)
+    _pick_date(dlg.end_date_btn, QDate(2026, 3, 30))
+    assert not dlg.save_btn.isEnabled()
+    _pick_date(dlg.end_date_btn, QDate(2026, 4, 5))
+    assert dlg.save_btn.isEnabled()
+    _pick_date(dlg.start_date_btn, QDate(2026, 4, 10))
+    assert dlg.end_date_btn.date() == QDate(2026, 4, 15)  # 長度已更新為 5 天
+
+
+def test_toggle_all_day_recomputes_duration(dialog_cls):
+    dlg = dialog_cls(default_date=QDate(2026, 5, 6))
+    _pick_date(dlg.end_date_btn, QDate(2026, 5, 8))  # 09:00 -> 5/8 10:00
+    dlg.all_day_chk.setChecked(True)  # 長度 2 天
+    _pick_date(dlg.start_date_btn, QDate(2026, 6, 1))
+    assert dlg.end_date_btn.date() == QDate(2026, 6, 3)
+    dlg.all_day_chk.setChecked(False)  # 6/1 09:00 -> 6/3 10:00，長度 2 天又 60 分
+    dlg.start_time.setCurrentText("12:00")
+    assert dlg.end_date_btn.date() == QDate(2026, 6, 3)
+    assert dlg.end_time.currentText() == "13:00"
+
+
+def test_toggle_all_day_reruns_validity(dialog_cls):
+    dlg = dialog_cls(default_date=QDate(2026, 5, 6))
+    dlg.end_time.setCurrentText("08:00")  # 同日結束早於開始
+    assert not dlg.save_btn.isEnabled()
+    dlg.all_day_chk.setChecked(True)  # 全天只比日期，同日合法
+    assert dlg.save_btn.isEnabled()
+    assert dlg.end_date_btn.property("invalid") == "false"
+
+
+def test_accept_still_guards_invalid(dialog_cls, monkeypatch):
+    import ui.calendar_dialog as cd
+    shown = []
+    monkeypatch.setattr(cd.QMessageBox, "warning", lambda *a, **k: shown.append(a))
+    dlg = dialog_cls(default_date=QDate(2026, 5, 6))
+    dlg.end_date_btn.setDate(QDate(2026, 5, 1))
+    dlg.accept()
+    assert shown and dlg.result() == 0
+
+
+def test_invalid_then_toggle_all_day_does_not_mix_units(dialog_cls):
+    dlg = dialog_cls(default_date=QDate(2026, 5, 6))  # 09:00-10:00，分鐘長度 60
+    _pick_date(dlg.end_date_btn, QDate(2026, 5, 5))  # 非法
+    dlg.all_day_chk.setChecked(True)  # 全天仍非法，天數沿用初始 0
+    _pick_date(dlg.start_date_btn, QDate(2026, 5, 10))
+    assert dlg.end_date_btn.date() == QDate(2026, 5, 10)
+
+
+def test_invalid_all_day_then_toggle_back_does_not_mix_units(dialog_cls):
+    dlg = dialog_cls(event_data=_all_day_event())  # 3/10 - 3/12，天數 2
+    _pick_date(dlg.end_date_btn, QDate(2026, 3, 9))  # 非法
+    dlg.all_day_chk.setChecked(False)  # 定時 09:00 起，3/9 結束仍非法，分鐘沿用 60
+    dlg.start_time.setCurrentText("10:00")
+    assert dlg.end_date_btn.date() == QDate(2026, 3, 10)
+    assert dlg.end_time.currentText() == "11:00"
+
+
+def test_linked_off_grid_items_do_not_accumulate(dialog_cls):
+    dlg = dialog_cls(default_date=QDate(2026, 5, 6))
+    dlg._select_time(dlg.end_time, "09:45")  # 長度 45 分（09:45 不在 30 分清單，手動插入）
+    base = dlg.end_time.count()
+    for t in ("10:00", "11:00", "12:00", "13:00"):
+        dlg.start_time.setCurrentText(t)
+    assert dlg.end_time.count() <= base + 1
+    assert dlg.end_time.currentText() == "13:45"
+
+
+def test_popup_date_click_emits_only_when_changed(qapp):
+    from ui.calendar_dialog import DatePopupButton
+    btn = DatePopupButton(QDate(2026, 1, 1))
+    got = []
+    btn.dateChanged.connect(got.append)
+    btn._on_popup_date_clicked(QDate(2026, 1, 1))  # 同一天：不發
+    assert got == []
+    btn._on_popup_date_clicked(QDate(2026, 1, 5))  # 不同天：發一次
+    assert got == [QDate(2026, 1, 5)]
+    assert btn.date() == QDate(2026, 1, 5)

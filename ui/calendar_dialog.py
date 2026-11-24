@@ -4,7 +4,7 @@ ui/calendar_dialog.py
 樣式一律來自全域 QSS（ui/styles.py 的 _DIALOG 等區段）；此檔只處理版面與邏輯。
 """
 
-from PyQt6.QtCore import QDate, QSize, Qt
+from PyQt6.QtCore import QDate, QDateTime, QSize, QTime, Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QGuiApplication, QIcon, QPainter, QPixmap, QTextCharFormat
 from PyQt6.QtWidgets import (
     QCalendarWidget, QCheckBox, QComboBox, QDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 from ui import icons, theme
 from ui.components import level_color
 from ui.confirm_dialog import ConfirmDialog, DarkTitleDialog, apply_window_icon
-from ui.styles import qcolor
+from ui.styles import qcolor, repolish
 
 
 _WEEKDAY_ZH = "一二三四五六日"  # QDate.dayOfWeek(): 1=週一 ... 7=週日；不依賴系統 locale
@@ -60,6 +60,8 @@ class ConfirmDeleteDialog(ConfirmDialog):
 
 
 class DatePopupButton(QPushButton):
+    dateChanged = pyqtSignal(QDate)  # 只在使用者從彈出日曆選日期時發出；setDate() 不發出
+
     def __init__(self, default_date=None, parent=None):
         super().__init__(parent)
         self.setObjectName("DatePopupButton")
@@ -81,6 +83,14 @@ class DatePopupButton(QPushButton):
         self.selected_date = date
         self.update_text()
 
+    def _on_popup_date_clicked(self, date):
+        """彈出日曆點選日期：更新顯示；與原日期不同時才發出 dateChanged"""
+        changed = date != self.selected_date
+        self.selected_date = date
+        self.update_text()
+        if changed:
+            self.dateChanged.emit(date)
+
     def show_calendar_popup(self):
         popup = QDialog(self, Qt.WindowType.Popup)
         popup.setObjectName("DatePopup")
@@ -100,9 +110,8 @@ class DatePopupButton(QPushButton):
         cal.setWeekdayTextFormat(Qt.DayOfWeek.Saturday, weekend_fmt)
 
         def on_date_clicked(date):
-            self.selected_date = date
-            self.update_text()
             popup.accept()
+            self._on_popup_date_clicked(date)
 
         cal.clicked.connect(on_date_clicked)
         layout.addWidget(cal)
@@ -118,8 +127,14 @@ class CalendarDialog(DarkTitleDialog):
         self.event_data = event_data or {}
         self.default_date = default_date if default_date is not None else QDate.currentDate()
         self.is_delete = False
+        self._duration_minutes = 60  # 非全天模式的長度（分鐘）
+        self._duration_days = 0  # 全天模式的長度（天數）
+        self._linked_extra = None  # 連動時插入結束時間 combo 的非 30 分項目
+        self._syncing = False  # 程式更新結束欄位時為 True，避免遞迴觸發連動
         self.init_ui()
         self.load_event_data()
+        self._recompute_duration()
+        self._connect_linkage()
 
     def _build_priority_combo(self):
         combo = QComboBox(self)
@@ -256,6 +271,84 @@ class CalendarDialog(DarkTitleDialog):
         self.end_time.setVisible(not checked)
         self.start_time.setEnabled(not checked)
         self.end_time.setEnabled(not checked)
+        # 長度依模式重新計算，並重跑狀態檢查（init 期間尚未有儲存鈕時略過）
+        if hasattr(self, "save_btn"):
+            self._recompute_duration()
+
+    # ------------------------------------------------------------ 開始/結束連動
+
+    def _connect_linkage(self):
+        self.start_date_btn.dateChanged.connect(self._on_start_changed)
+        self.start_time.currentIndexChanged.connect(self._on_start_changed)
+        self.end_date_btn.dateChanged.connect(self._on_end_changed)
+        self.end_time.currentIndexChanged.connect(self._on_end_changed)
+
+    @staticmethod
+    def _combo_time(combo):
+        t = QTime.fromString(combo.currentText(), "HH:mm")
+        return t if t.isValid() else QTime(0, 0)
+
+    def _start_end_datetimes(self):
+        """回傳 (開始, 結束) QDateTime；全天模式時間固定 00:00。"""
+        if self.all_day_chk.isChecked():
+            t_start = t_end = QTime(0, 0)
+        else:
+            t_start, t_end = self._combo_time(self.start_time), self._combo_time(self.end_time)
+        spec = Qt.TimeSpec.UTC  # 牆上時間運算，避免夏令時間造成偏移
+        return (QDateTime(self.start_date_btn.date(), t_start, spec),
+                QDateTime(self.end_date_btn.date(), t_end, spec))
+
+    def _recompute_duration(self):
+        """依目前欄位重算長度（結束早於開始時維持原長度），並更新錯誤狀態。"""
+        start, end = self._start_end_datetimes()
+        if end >= start:
+            if self.all_day_chk.isChecked():
+                self._duration_days = start.date().daysTo(end.date())
+            else:
+                self._duration_minutes = start.secsTo(end) // 60
+        self._update_validity()
+
+    def _on_start_changed(self, *_):
+        if self._syncing:
+            return
+        start, _end = self._start_end_datetimes()
+        if self.all_day_chk.isChecked():
+            new_end = start.addDays(self._duration_days)
+        else:
+            new_end = start.addSecs(self._duration_minutes * 60)
+        self._syncing = True
+        try:
+            self.end_date_btn.setDate(new_end.date())
+            if not self.all_day_chk.isChecked():  # 全天時結束時間欄位隱藏，保持原值
+                self._link_end_time(new_end.time().toString("HH:mm"))
+        finally:
+            self._syncing = False
+        self._update_validity()
+
+    def _link_end_time(self, hhmm):
+        """連動設定結束時間；清除先前連動插入、現已不用的非 30 分項目，避免累積"""
+        extra = self._linked_extra
+        if extra and extra != hhmm:
+            i = self.end_time.findText(extra)
+            if i >= 0:
+                self.end_time.removeItem(i)
+            self._linked_extra = None
+        if self.end_time.findText(hhmm) < 0:
+            self._linked_extra = hhmm
+        self._select_time(self.end_time, hhmm)
+
+    def _on_end_changed(self, *_):
+        if self._syncing:
+            return
+        self._recompute_duration()
+
+    def _update_validity(self):
+        start, end = self._start_end_datetimes()
+        invalid = end < start
+        for w in (self.end_date_btn, self.end_time):
+            w.setProperty("invalid", "true" if invalid else "false")
+            repolish(w)
+        self.save_btn.setEnabled(not invalid)
 
     @staticmethod
     def _select_time(combo, hhmm):

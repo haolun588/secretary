@@ -44,7 +44,7 @@ secretary/
 │   ├── month_grid.py             # 月視圖（QPainter 自繪）
 │   ├── time_grid.py              # 週／日共用時間軸視圖（QPainter 自繪）
 │   ├── side_panel.py             # 右側 300px 面板：即將到來、選取日清單、等級圖例
-│   ├── calendar_dialog.py        # 行程新增/編輯對話框（2 欄排版、等級色點、全天開關、DatePopupButton）；提醒時間選單尚未實作
+│   ├── calendar_dialog.py        # 行程新增/編輯對話框（2 欄排版、等級色點、全天開關、DatePopupButton；開始/結束連動：改開始時結束依「目前長度」跟著移，結束早於開始時標紅並停用儲存）；提醒時間選單尚未實作
 │   ├── confirm_dialog.py         # 共用確認對話框 ConfirmDialog（刪除、登出）
 │   ├── settings_view.py          # 設定頁：段落式清單（一般、Google 日曆）；喝水提醒已移至 water_view.py
 │   ├── water_view.py             # 喝水提醒頁：大字倒數（set_countdown，None 顯示「已停用」）＋啟用開關、提醒間隔、測試按鈕

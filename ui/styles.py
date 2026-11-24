@@ -399,10 +399,13 @@ QDialog#DatePopup { background: {SURFACE_2}; border: 1px solid {BORDER_STRONG}; 
 QFrame#DialogFooter { background: transparent; border: none; border-top: 1px solid {BORDER}; }
 QPushButton#DatePopupButton { text-align: left; font-weight: {WEIGHT_REGULAR}; background: {SURFACE_2}; border: 1px solid {BORDER}; }
 QPushButton#DatePopupButton:hover { border-color: {BORDER_STRONG}; }
+QPushButton#DatePopupButton[invalid="true"], QPushButton#DatePopupButton[invalid="true"]:hover,
+QDialog QComboBox[invalid="true"], QDialog QComboBox[invalid="true"]:hover,
+QDialog QComboBox[invalid="true"]:focus { border: 1px solid {DANGER}; }
 """
 
 _SETTINGS = """
-QWidget#SettingsPage { background: {BG}; }
+QWidget#SettingsPage, QWidget#WaterPage { background: {BG}; }
 QFrame#SettingsGroup {
     background: {SURFACE_1};
     border: 1px solid {BORDER};
@@ -412,6 +415,9 @@ QFrame#SettingsRow { background: transparent; border: none; border-bottom: 1px s
 QFrame#SettingsRow[last="true"] { border-bottom: none; }
 QLabel#SettingsRowTitle { font-size: {FONT_SM}px; font-weight: {WEIGHT_SEMIBOLD}; }
 QLabel#SettingsRowDesc { font-size: {FONT_XS}px; color: {TEXT_SECONDARY}; }
+QLabel#WaterCountdown { font-size: {FONT_DISPLAY}px; font-weight: {WEIGHT_SEMIBOLD}; color: {TEXT_PRIMARY}; }
+QLabel#WaterCountdown[off="true"] { color: {TEXT_MUTED}; }
+QLabel#WaterCountdownCaption { font-size: {FONT_XS}px; color: {TEXT_SECONDARY}; }
 QLabel#AccountStatus { font-size: {FONT_XS}px; color: {TEXT_SECONDARY}; }
 QLabel#AccountStatus[state="ok"] { color: {SUCCESS}; }
 QLabel#AccountStatus[state="error"] { color: {DANGER}; }
