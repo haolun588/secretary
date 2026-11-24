@@ -12,11 +12,11 @@
 - **定時喝水提醒**：每 N 分鐘（預設 10 分鐘，可透過 UI 調整）於螢幕右下角彈出提醒視窗，顯示約 3 秒後自動淡出 (Fade-out)。
 - **Google 日曆整合與色彩標籤等級對應**：
   - 主介面整合日曆，支援串接 Google Calendar API。
-  - **Google 日曆色彩標籤 (Event Color ID) 對應規則**（以 `utils/google_calendar.py` 的 `COLOR_PRIORITY_MAP` 為準）：
+  - **Google 日曆色彩標籤 (Event Color ID) 對應規則**（以 `services/event_mapping.py` 的 `COLOR_PRIORITY_MAP` 為準）：
     - **Color ID 11 (Tomato)、4 (Flamingo)** ➔ **大事件 (提前 30 天/1個月顯示於右側提醒欄)**
     - **Color ID 5 (Banana)、6 (Tangerine)** ➔ **中事件 (提前 7 天/1週顯示於右側提醒欄)**
     - **Color ID 2 (Sage)、10 (Basil)** ➔ **小事件 (提前 3 天顯示於右側提醒欄)**
-    - **未對應的顏色與預設色（無 colorId，或其他 ID 如 1、3、7、8、9）** ➔ 實際被當成**小事件**（`parse_priority_from_color` 預設值為 `minor`）。
+    - **未對應的顏色與預設色（無 colorId，或其他 ID 如 1、3、7、8、9）** ➔ 實際被當成**小事件**（`priority_from_color` 預設值為 `minor`）。
 - **Google 日曆原生多階段提醒 (reminders.overrides)**：
   - 全面使用 Google API 原生 `reminders` 欄位傳遞與讀取通知時間（支援多選：如 10 分鐘前、30 分鐘前、1 小時前、1 天前）。
   - 與手機 App 及網頁版設定完美跨平台同步，棄用外掛獨立文字標籤，供其他提醒端統一讀取。（雲端 Bot / Discord 不屬於本 repo 範圍。）
@@ -43,7 +43,7 @@
 ### 2.3 測試規範
 - 測試放在 `tests/`，以 `python -m pytest` 執行；開發依賴見 `requirements-dev.txt`。
 - 測試不得啟動 GUI、不得連網（Google API / OAuth）、不得碰真實 `data/`，檔案一律使用 `tmp_path` + `monkeypatch`。
-- 匯入 `utils/google_calendar.py` 會修改全域 `socket.getaddrinfo` 與預設逾時，測試須在 fixture 中還原。
+- `services/google_client` 匯入時無副作用（不修改全域 `socket.getaddrinfo` 與預設逾時），測試以假 service / 假 client 注入，不需額外還原。
 
 ## 3. 開發階段
 （名稱與 `docs/progress.md` 一致）
@@ -53,7 +53,7 @@
 4. **Phase 4 Google 日曆原生多階段提醒支援**（規劃中）：實現行程編輯對話框提醒選擇 UI 與 `reminders.overrides` 讀寫。
 
 ## 4. 同步原則
-> 以下為目標規範，現行程式尚未完全符合（見 `docs/progress.md` 已知問題）。
+> 以下原則已於階段 B（2026-11-24）落實；尚待處理的相關事項見 `docs/progress.md` 已知問題。
 
 - Google Calendar 為唯一資料來源。
 - 寫入成功後才更新本地 UI（或寫入後重新拉取）。
@@ -61,3 +61,5 @@
 - 部分更新使用 `events().patch`，避免 `update` 整筆覆蓋清掉未帶欄位。
 - 全天行程使用 `{'date': ...}` 而非 `dateTime`。
 - 網路呼叫（Google API、OAuth）在背景執行緒執行，不阻塞 Qt 主執行緒。
+- 事件時間以系統時區解析與寫入（`services/event_mapping.py`），不寫死 offset。
+- 網路呼叫一律經 `EventStore`（`services/event_store.py`），UI 不直接呼叫 `services/google_client`。
