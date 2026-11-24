@@ -50,11 +50,11 @@
 17. 右側「即將到來」側欄仍受拉取範圍影響（`ensure_month` 前後各一個月），瀏覽到 2 個月以外時可能變空。現行規則：明天以後的行程依等級 30/7/3 天內顯示、含進行中行程、排除已結束的定時行程；今天開始的只出現在選取日清單。
 18. `main.py` 單一實例 socket 名稱（`SINGLE_INSTANCE_SOCKET`）含使用者名稱，屬寫死個人資訊，應改為動態或通用名稱。
 
-18. 週視圖 7 欄時，3 筆以上重疊的行程欄位很窄，僅顯示標題前幾字，需靠 tooltip 看全文。
-19. offscreen 預覽的中文需由 `render_preview` 載入 `msjh.ttc`；實機不受影響。
-20. `assets/arrow_up.png`、`arrow_down.png` 與 `scripts/arrow_generator.py` 已無程式引用，`utils/paths.qss_url` 亦已無 UI 使用，留待階段 D 清理。
-21. `tests/test_event_store.py` 的 `processEvents` 會遺留事件，全套件中曾造成 access violation（階段 C 新測試已避開），待階段 D 處理。
-22. `DatePopupButton` 的彈出月曆仍是 `QCalendarWidget`（僅供挑日期），未做預覽。
+19. 週視圖 7 欄時，3 筆以上重疊的行程欄位很窄，僅顯示標題前幾字，需靠 tooltip 看全文。
+20. offscreen 預覽的中文需由 `render_preview` 載入 `msjh.ttc`；實機不受影響。
+21. `assets/arrow_up.png`、`arrow_down.png` 與 `scripts/arrow_generator.py` 已無程式引用，`utils/paths.qss_url` 亦已無 UI 使用，留待階段 D 清理。
+22. `tests/test_event_store.py` 的 `processEvents` 會遺留事件，全套件中曾造成 access violation（階段 C 新測試已避開），待階段 D 處理。
+23. `DatePopupButton` 的彈出月曆仍是 `QCalendarWidget`（僅供挑日期），未做預覽。
 
 ## 📌 階段 A: 基礎建設 (已完成，2026-11-24)
 - [x] `utils/logger.py`：`get_logger(__name__)`，RotatingFileHandler 寫入 `data/logs/secretary.log`，pythonw 無 stdout 時不加 StreamHandler，建立目錄或開檔失敗不崩潰
