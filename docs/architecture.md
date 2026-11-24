@@ -4,60 +4,82 @@
 ```
 secretary/
 ├── CLAUDE.md                     # AI 協作規範與作業紅線
-├── requirements.txt              # 直接依賴（固定版本；httplib2 尚待補列，見 progress.md 階段 B）
+├── requirements.txt              # 直接依賴（固定版本）
 ├── requirements-dev.txt          # 開發依賴（pytest，固定版本）
 ├── .gitignore
-├── assets/                       # 圖示資源 (icon.ico / icon.png / arrow_up.png / arrow_down.png)
+├── assets/                       # 圖示資源
+│   ├── icon.ico / icon.png       # 應用程式圖示
+│   ├── arrow_up.png / arrow_down.png  # 已無程式引用，留待階段 D 清理
+│   └── icons/*.svg               # UI 線條圖示（專案自繪，24 格、stroke currentColor；風格參考 Lucide（ISC 授權），非複製 Lucide 原始檔）
 ├── docs/
-│   ├── dev_rules.md              # 技術規範與設計指南 (含托盤化與開機靜默啟動)
+│   ├── dev_rules.md              # 技術規範與設計指南（含 UI 規範、視覺預覽）
 │   ├── progress.md               # 任務進度清單與已知問題
 │   ├── architecture.md           # 本系統架構文件
 │   └── dev_logs/                 # 開工/收工日誌目錄 (YYYYMMDD_主題.md)
 ├── data/                         # 執行期資料 (不進版控，整個資料夾被 .gitignore 排除)
-│   ├── config.json               # 使用者設定檔
-│   ├── credentials.json          # Google OAuth 憑證
-│   ├── token.json                # Google OAuth token
-│   └── logs/                     # 日誌目錄 (secretary.log，由 utils/logger.py 寫入，輪替 1MB x 3)
-├── main.py                       # 主程式入口 (托盤圖示 QSystemTrayIcon、closeEvent 攔截與背景計時器)
-├── scripts/                      # 開發/一次性工具腳本 (可直接 python scripts/xxx.py 執行)
+│   ├── config.json / credentials.json / token.json
+│   └── logs/                     # secretary.log，由 utils/logger.py 寫入，輪替 1MB x 3
+├── main.py                       # 主程式入口：托盤、單一實例、喝水計時（WaterCountdown）、EventStore 建立與注入、toast 堆疊、套用全域樣式
+├── scripts/                      # 開發/一次性工具腳本
 │   ├── create_shortcut.py        # 建立桌面捷徑與啟動 .bat
-│   ├── arrow_generator.py        # 箭頭圖示產生器
-│   └── icon_generator.py         # 應用程式圖示產生器
-├── tests/                        # 自動化測試 (pytest；不連網、不啟動 GUI、不碰真實 data/)
-│   ├── conftest.py               # 專案根加入 sys.path，並將測試期日誌導向暫存目錄
-│   └── test_*.py                 # theme / paths / config_manager / logger / event_mapping / event_store / google_client / calendar_view / calendar_dialog
+│   ├── arrow_generator.py        # 箭頭圖示產生器（已無程式引用，待階段 D 清理）
+│   ├── icon_generator.py         # 應用程式圖示產生器
+│   └── render_preview.py         # offscreen 視覺預覽：假資料（FakeStore / FakeConfig）渲染各畫面成 PNG，不連網、不讀 data/
+├── tests/                        # 自動化測試 (pytest；不連網、不開可見 GUI、不碰真實 data/)
+│   ├── conftest.py               # 專案根加入 sys.path、日誌導向暫存目錄、session 範圍單一 offscreen QApplication
+│   └── test_*.py
 ├── services/                     # Google 日曆同步層（不含 UI 繪製）
-│   ├── __init__.py
 │   ├── event_mapping.py          # 純函式：色彩<->等級、Google event<->內部 dict、全天 end 換算、patch body、month_range、系統時區
-│   ├── google_client.py          # Google Calendar API 薄封裝（同步阻塞，須在背景執行緒呼叫；匯入無副作用；httplib2 逾時 15 秒；OAuth 逾時 180 秒）
+│   ├── google_client.py          # Google Calendar API 薄封裝（同步阻塞，須在背景執行緒呼叫；httplib2 逾時 15 秒；OAuth 逾時 180 秒）
 │   └── event_store.py            # EventStore(QObject)：行程資料唯一來源、signals、ThreadPoolRunner / DaemonThreadRunner
 ├── ui/
-│   ├── main_window.py            # 主視窗外框 (包含 closeEvent 重寫，點擊 ✕ 隱藏至托盤)
-│   ├── nav_sidebar.py            # 左側選單欄元件
-│   ├── calendar_view.py          # 日曆頁面 (含大/中/小色彩標籤過濾提醒側邊欄)
-│   ├── settings_view.py          # 設定頁面 (喝水提醒間隔、開機自啟動控制)
-│   ├── calendar_dialog.py        # 行程新增/修改對話框 (含事件等級選單與刪除確認；提醒時間選單尚未實作)
-│   ├── theme.py                  # 深色精緻版主題 token 與 qss() 範本替換 (純資料，不依賴 PyQt6)
-│   └── toast_window.py           # 右下角喝水提醒彈窗 (含 3 秒淡出動畫)
+│   ├── theme.py                  # 設計 token（顏色、字級、間距、圓角、版面尺寸、PRIORITY_*）與 qss() 範本替換；純資料，不依賴 PyQt6
+│   ├── styles.py                 # 全域 QSS（依元件分段：按鈕、輸入、開關、選單、捲軸、導覽、工具列、面板、對話框、設定、toast…）、build_palette、apply_app_style、qcolor、make_font、fit_text、repolish
+│   ├── icons.py                  # SVG 圖示載入與上色：icon()/pixmap()，處理高 DPI；QSS 用的上色圖示匯出
+│   ├── components.py             # 共用元件：IconButton、SegmentedControl、SyncStatusBadge、LevelDot、level_color、sync_state_presentation
+│   ├── nav_sidebar.py            # 52px 圖示導覽列：Logo／日曆／喝水／設定（checkable 互斥）＋底部喝水倒數（set_countdown、format_countdown）
+│   ├── main_window.py            # 主視窗外框：NavSidebar + QStackedWidget(CalendarView, SettingsView)，首次顯示啟用深色標題列，closeEvent 縮到托盤
+│   ├── calendar_view.py          # 日曆頁：工具列（標題、‹ ›、今天、月/週/日、同步徽章、新增）+ 視圖區 + 右側面板；串接 EventStore
+│   ├── calendar_logic.py         # 日曆純邏輯（不 import Qt widgets）：月格日期、週日期、行程日期解析、即將到來規則、還有 N 天、時間軸重疊分欄
+│   ├── month_grid.py             # 月視圖（QPainter 自繪）
+│   ├── time_grid.py              # 週／日共用時間軸視圖（QPainter 自繪）
+│   ├── side_panel.py             # 右側 300px 面板：即將到來、選取日清單、等級圖例
+│   ├── calendar_dialog.py        # 行程新增/編輯對話框（2 欄排版、等級色點、全天開關、DatePopupButton）；提醒時間選單尚未實作
+│   ├── confirm_dialog.py         # 共用確認對話框 ConfirmDialog（刪除、登出）
+│   ├── settings_view.py          # 設定頁：段落式清單（喝水提醒、一般、Google 日曆），scroll_to_water()
+│   ├── toast_window.py           # ToastWindow（info/water/danger、按鈕、關閉鈕、hover 暫停）與 ToastStack（多則堆疊與重排）
+│   └── tray_menu.py              # 托盤右鍵選單建構（圖示、無 emoji）
 └── utils/
     ├── autostart.py              # 開機自啟動登錄檔控制模組 (支援 --minimized 靜默啟動)
-    ├── config_manager.py         # 設定檔讀寫模組 (config.json 持久化)
+    ├── config_manager.py         # 設定檔讀寫 (config.json)；save_config_or_warn 寫入失敗時提示使用者
     ├── logger.py                 # 日誌設定 (get_logger，RotatingFileHandler 寫入 data/logs/)
-    └── paths.py                  # 集中路徑定義 (data/、assets/ 絕對路徑與舊檔搬遷)
+    ├── paths.py                  # 集中路徑定義（qss_url 已無 UI 使用，待階段 D 清理）
+    ├── water_timer.py            # WaterCountdown：喝水倒數純邏輯（tick／snooze／reset，無 Qt）
+    └── win_titlebar.py           # enable_dark_titlebar：DWM 深色標題列，失敗回傳 False 不 raise
 ```
 
 ## 2. 資料流與組件交互說明
-1. **開機靜默啟動與托盤化**：
-   - 當系統開機啟動，`main.py` 接收到 `--minimized` 參數，不呼叫 `window.show()`，直接隱藏於 `QSystemTrayIcon`。
-2. **視窗關閉攔截 (`closeEvent`)**：
-   - 當使用者點擊視窗右上角的 `✕` 關閉按鈕，`main_window.py` 攔截事件並呼叫 `event.ignore()` 與 `self.hide()`，視窗隱藏至系統托盤持續運作。
-3. **托盤右鍵選單**：
-   - 提供「顯示小助理主視窗」、「測試喝水提醒彈窗」、「系統與提醒設定」、「退出程式」四項。
-4. **Google 日曆與色彩標籤過濾**：
-   - `services/event_mapping.py` 解析 Google 日曆的 `colorId`（11、4 大 30 天 / 5、6 中 7 天 / 2、10 小 3 天；未對應顏色視為小事件），並呈現於右側提醒欄。
-5. **Google 日曆原生多階段提醒 (reminders.overrides)**（Phase 4 規劃中，尚未實作）：
-   - 透過 `services/event_mapping.py`（`to_google_body` / `build_patch_body` / `from_google`）傳遞與讀取 API 原生 `reminders` 屬性（如 10 分鐘前、1 小時前、1 天前等多重提醒分鐘數）。
-   - 確保在 `secretary` 桌面端、手機 Google 日曆 App 或網頁版設定的提醒皆能同步，並供背景/雲端 Bot 統一輪詢發送提醒。
+1. **開機靜默啟動與托盤化**：系統開機啟動時 `main.py` 接收 `--minimized`，不呼叫 `window.show()`，直接隱藏於 `QSystemTrayIcon`。
+2. **視窗關閉攔截 (`closeEvent`)**：`MainWindow.closeEvent` 依 config 的 `minimize_to_tray`（設定頁可切換）決定隱藏至托盤或結束。
+3. **托盤右鍵選單**：`ui/tray_menu.py` 建構，含圖示的「顯示主視窗」「測試喝水提醒」「系統與提醒設定」「退出程式」，樣式由全域 QSS 的 QMenu 分段套用。
+4. **Google 日曆與色彩標籤等級**：`services/event_mapping.py` 解析 `colorId`（11、4 大 30 天 / 5、6 中 7 天 / 2、10 小 3 天；未對應視為小事件），顯示為色條與圓點。
+5. **喝水提醒**：`main.py` 每秒 tick `utils/water_timer.WaterCountdown`，到時以 `ToastStack` 顯示 water 樣式 toast（按鈕「延後 10 分鐘」「已喝」）；導覽列底部以 `set_countdown` 顯示剩餘時間。設定頁的測試按鈕只發 `test_toast_requested`，由 `main.py` 顯示 toast，確保仍走堆疊。
+6. **Google 日曆原生多階段提醒 (reminders.overrides)**（Phase 4 規劃中，尚未實作）：透過 `services/event_mapping.py` 傳遞與讀取 API 原生 `reminders`。
+
+### 2.1 設計系統（階段 C）
+- `ui/theme.py` 為所有視覺數值的唯一來源；`ui/styles.py` 把 token 組成全域 QSS，由 `main.py` 以 `apply_app_style(app)` 一次套用（同時設定 palette 與全域字型，頂層視窗底色因此預設為 BG）。
+- 元件以 objectName、動態屬性 `variant`（按鈕）與 `role`（語意 label）選擇樣式，切換屬性後呼叫 `repolish()`。
+- 圖示：`assets/icons/*.svg` 為專案自繪的 24 格線條圖示，風格參考 Lucide（ISC 授權），非複製其原始檔；`ui/icons.py` 依 token 上色並處理高 DPI。
+- 深色標題列：`utils/win_titlebar.py` 只呼叫 DWM 視窗屬性（不碰 Registry），主視窗與對話框 showEvent 時啟用。
+
+### 2.2 日曆頁結構與設計取捨
+- **導覽**：`NavSidebar` 為 52px 圖示列。喝水按鈕切到設定頁並捲到喝水區塊，不另設頁面：喝水只有開關、間隔、測試三個控制，獨立頁太空且與設定重複；導覽列仍提供一鍵直達。
+- **自繪而非現成元件**：月視圖、時間軸以 QPainter 自繪，不用 `QCalendarWidget` 或 `QTableView`+delegate。理由：格內色條 chip、「+N」、今天淡底需精細控制；命中測試是純幾何，可直接單元測試；時間軸的重疊並排分欄與現在時間線，標準元件無法表達。（`DatePopupButton` 彈出的小月曆仍是 `QCalendarWidget`，僅供挑日期。）
+- **純邏輯分離**：`calendar_logic.py` 不依賴 Qt widgets，涵蓋月格 42 格、週日期、`parse_event_dates`、`upcoming`、`timed_layout` 等，有完整單元測試。
+- **右側面板**：「即將到來」規則為明天以後依等級 30/7/3 天內、含進行中行程、排除已結束的定時行程、今天開始的只出現在選取日清單；另有選取日清單與等級圖例。
+
+### 2.3 日曆資料流
+`EventStore` signals → `CalendarView`（`events_changed`、`sync_state_changed`）／`SettingsView`（`sync_state_changed`、`auth_state_changed`）／`SyncStatusBadge`（經 `CalendarView` 轉入 `set_state`）。拉取範圍：月／日視圖以選取日所在月份、週視圖以該週第一天所在月份呼叫 `ensure_month`，`EventStore` 自帶前後各一個月。
 
 ## 3. 行程同步資料流（階段 B）
 ```
@@ -75,12 +97,12 @@ services/google_client.py ──► Google Calendar API
    │  結果（成功值或例外）以 QueuedConnection signal 回主執行緒
    ▼
 EventStore 更新本地清單（寫入成功才更新；fetch 失敗保留舊資料；過期世代的 fetch 結果丟棄）
-   ├─► events_changed(list) ──► CalendarView 重繪月曆與「即將到來」側欄
+   ├─► events_changed(list) ──► CalendarView 重繪月/週/日視圖、「即將到來」與選取日清單
    ├─► sync_state_changed / auth_state_changed ──► SettingsView 更新狀態
    ├─► operation_succeeded(action)
    └─► operation_failed(action, 訊息) ──► main.py：toast；寫入類（add/update/delete/auth）另跳 QMessageBox
                                           （fetch/check 相同訊息連續只提示一次）
 ```
 - 內部 event dict 欄位：`id, title, all_day, start, end, priority, location, notes, color_id`；全天事件 `end` 為含當天（Google `end.date` 減 1 天）。
-- 拉取範圍為目前顯示月份前後各一個月（`ensure_month` / `month_range`），切換月份自動拉取。
+- 拉取範圍為 `ensure_month` 指定月份前後各一個月（`month_range`），切換月份／週自動拉取；錨點規則見 2.3。
 - UI 不直接呼叫 `google_client`，一律經 `EventStore`。

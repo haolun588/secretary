@@ -1,15 +1,15 @@
 # Secretary 專案開發進度清單 (Development Progress)
 
-## 📌 Phase 1: 基礎架構與桌面 UI 介面 (已完成)
+## 📌 Phase 1: 基礎架構與桌面 UI 介面 (已完成；UI 已由階段 C 取代)
 - [x] PyQt6 專案目錄結構與主程式建立 (`main.py`, `ui/`)
-- [x] 暗黑高顏值主題與電光紫配色 (`#121217`, `#1c1c24`, `#8b5cf6`)
-- [x] 左側導覽列 `NavSidebar` (日曆與行程 / 喝水與設定)
-- [x] 中間月曆 `CalendarView` (440px 寬、1:1 置中、週末電光紫字體)
-- [x] 右側提醒面板 `SidebarFrame` (340px 緊貼右側、雙行頂部導覽列)
+- [x] 暗黑高顏值主題與電光紫配色 (`#121217`, `#1c1c24`, `#8b5cf6`)（已由階段 C 的 `ui/theme.py` token 取代）
+- [x] 左側導覽列 `NavSidebar` (日曆與行程 / 喝水與設定)（階段 C 改為 52px 圖示導覽列）
+- [x] 中間月曆 `CalendarView` (440px 寬、1:1 置中、週末電光紫字體)（階段 C 改為自繪月／週／日視圖，已無 QCalendarWidget）
+- [x] 右側提醒面板 `SidebarFrame` (340px 緊貼右側、雙行頂部導覽列)（階段 C 改為 300px `SidePanel`）
 - [x] 選取日期當日行程卡片 `TodayEventCard` (標題/地點/備註獨立三行、100% 依字數自適應高度、`word-break: break-all` 自動折行)
 
 ## 📌 Phase 2: 喝水提醒與系統整合 (已完成)
-- [x] 螢幕右下角 3 秒淡出 Toast 提醒視窗 (`ToastWindow`)
+- [x] 螢幕右下角 3 秒淡出 Toast 提醒視窗 (`ToastWindow`)（階段 C 起喝水 toast 含按鈕時顯示 8 秒、hover 暫停）
 - [x] Windows 系統訊息提示音 (`winsound.MessageBeep`)
 - [x] 1 秒實時動態背景倒數計時器 (左下角 `下次提醒: MM:SS 後` 每秒秒數更新)
 - [x] 設定頁面喝水提醒總開關與間隔設定
@@ -47,8 +47,14 @@
 14. `local_tz()` 取目前時間的固定 offset，有夏令時間（DST）的地區，跨 DST 的日期會差 1 小時（台灣不受影響）。
 15. 定時行程改成全天時，原 `start.timeZone` 是否需一併清除，尚未對 Google 實測。
 16. 任何 `RefreshError` 都會清掉本地憑證，含可能可重試的情況（例如暫時性網路／伺服器錯誤）。
-17. 右側「即將到來」側欄受目前瀏覽月份的拉取範圍影響（前後各一個月），瀏覽到 2 個月以外時可能變空。
+17. 右側「即將到來」側欄仍受拉取範圍影響（`ensure_month` 前後各一個月），瀏覽到 2 個月以外時可能變空。現行規則：明天以後的行程依等級 30/7/3 天內顯示、含進行中行程、排除已結束的定時行程；今天開始的只出現在選取日清單。
 18. `main.py` 單一實例 socket 名稱（`SINGLE_INSTANCE_SOCKET`）含使用者名稱，屬寫死個人資訊，應改為動態或通用名稱。
+
+18. 週視圖 7 欄時，3 筆以上重疊的行程欄位很窄，僅顯示標題前幾字，需靠 tooltip 看全文。
+19. offscreen 預覽的中文需由 `render_preview` 載入 `msjh.ttc`；實機不受影響。
+20. `assets/arrow_up.png`、`arrow_down.png` 與 `scripts/arrow_generator.py` 已無程式引用，`utils/paths.qss_url` 亦已無 UI 使用，留待階段 D 清理。
+21. `tests/test_event_store.py` 的 `processEvents` 會遺留事件，全套件中曾造成 access violation（階段 C 新測試已避開），待階段 D 處理。
+22. `DatePopupButton` 的彈出月曆仍是 `QCalendarWidget`（僅供挑日期），未做預覽。
 
 ## 📌 階段 A: 基礎建設 (已完成，2026-11-24)
 - [x] `utils/logger.py`：`get_logger(__name__)`，RotatingFileHandler 寫入 `data/logs/secretary.log`，pythonw 無 stdout 時不加 StreamHandler，建立目錄或開檔失敗不崩潰
@@ -66,6 +72,14 @@
 - [x] UI 安全與提示：rich text 以 `html.escape`、純文字 QLabel 設 PlainText；錯誤以 toast + QMessageBox 提示，fetch/check 相同錯誤去重
 - [x] 新增測試：`test_event_mapping` / `test_event_store` / `test_google_client` / `test_calendar_view` / `test_calendar_dialog`（`python -m pytest -q`：125 passed）
 - [x] `requirements.txt` 已固定 `httplib2==0.32.0`
+
+## 📌 階段 C: 深色精緻版視覺與排版重設計 (2026-11-25 完成；已 commit，未實機驗證)
+- [x] 設計系統（26b4612）：`ui/theme.py` 新增版面與狀態 token；`ui/styles.py`（全域 QSS、palette、`qcolor`、`repolish`）；`ui/icons.py` + `assets/icons/*.svg`（自繪線條圖示）；`ui/components.py`（IconButton、SegmentedControl、SyncStatusBadge、LevelDot）；`utils/win_titlebar.py` 深色標題列；`scripts/render_preview.py`；`tests/conftest.py` 改 session 範圍 offscreen QApplication
+- [x] 主視窗與導覽（5beb90c）：`NavSidebar` 52px 圖示列（checkable 互斥，修正舊 `.NavBtn` 選取樣式未生效）；喝水按鈕切到設定頁喝水區塊；底部倒數 `set_countdown`；`MainWindow` 改用 token 並啟用深色標題列
+- [x] 日曆頁（3a5fecd）：`calendar_logic`（純邏輯）、`MonthGrid`、`TimeGrid`（QPainter 自繪）、`SidePanel`、重寫 `CalendarView`（月/週/日、同步徽章、重疊並排分欄、現在時間線、即將到來新規則）
+- [x] 對話框、設定、toast、托盤（e3a32ef）：`CalendarDialog` 2 欄排版、`ConfirmDialog`、段落式 `SettingsView`（新增「關閉視窗時縮到系統匣」與 Google 登入／登出）、`ToastWindow`／`ToastStack`、`tray_menu`、`WaterCountdown`（延後 10 分鐘／已喝）、`save_config_or_warn`、`main.py` 套用全域樣式
+- 測試狀態：`python -m pytest -q`：382 passed。
+- 未實機驗證：實際畫面與字型、深色標題列（主視窗與對話框）、高 DPI（125%/150% 下圖示與 1px 線）、最小視窗 960×620、月週日切換與 ‹ › 今天、雙擊新增／點行程編輯、對話框全天切換與儲存回寫、刪除確認、toast 按鈕（延後 10 分鐘、已喝）與 hover 暫停、多則 toast 堆疊、托盤選單樣式、設定頁各開關寫入 config、Google 登入／登出、關閉視窗縮到系統匣。
 
 ## 📌 Phase 4: Google 日曆原生多階段提醒支援 (規劃中)
 - [ ] `services/event_mapping.py` / `services/google_client.py`: 擴充 `to_google_body` / `build_patch_body` 支援傳送 `reminders.overrides`（包含 10 分鐘、30 分鐘、1 小時、1 天等多階段提醒）
