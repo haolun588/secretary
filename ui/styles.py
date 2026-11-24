@@ -11,6 +11,7 @@ ui/styles.py
 
 import re
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont, QPalette
 
 from ui import theme
@@ -38,6 +39,24 @@ def qcolor(value):
         color.setAlphaF(max(0.0, min(1.0, alpha)))
         return color
     raise ValueError(f"不支援的顏色格式: {value!r}")
+
+
+def make_font(size=theme.FONT_SM, weight=theme.WEIGHT_REGULAR):
+    """依 theme token 建立 QFont（給自訂 QPainter 元件用）。weight 只接受 400 / 600。"""
+    font = QFont()
+    font.setFamilies(list(theme.FONT_FAMILIES))
+    font.setPixelSize(size)
+    font.setWeight(QFont.Weight.DemiBold if weight >= theme.WEIGHT_SEMIBOLD else QFont.Weight.Normal)
+    return font
+
+
+def fit_text(metrics, text, width):
+    """單行文字配合寬度：放得下原文或能顯示部分字 + 省略號就用 elide 結果；
+    窄到只剩省略號時改回傳原文，由呼叫端以 setClipRect 裁切，至少露出前 1–2 個字。"""
+    elided = metrics.elidedText(text, Qt.TextElideMode.ElideRight, max(0, width))
+    if text and not elided.replace("…", ""):
+        return text
+    return elided
 
 
 def repolish(widget):

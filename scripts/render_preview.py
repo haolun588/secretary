@@ -54,6 +54,7 @@ def make_fake_events(today=None):
     add("生日", _iso(d(10)), _iso(d(10)), True, "minor")
     add("晨會", _iso(today, 9), _iso(today, 10), False, "medium", "會議室 A")
     add("設計討論", _iso(today, 9, 30), _iso(today, 11), False, "major", "線上")
+    add("站立會議", _iso(today, 9, 45), _iso(today, 10, 15), False, "minor")
     add("午餐", _iso(today, 12), _iso(today, 13), False, "minor")
     add("健身", _iso(today, 18), _iso(today, 19, 30), False, "minor")
     add("跨日夜班", _iso(d(2), 22), _iso(d(3), 0), False, "medium")
@@ -72,9 +73,9 @@ class FakeStore(QObject):
     operation_succeeded = pyqtSignal(str)
     auth_state_changed = pyqtSignal(bool)
 
-    def __init__(self, parent=None, authenticated=True):
+    def __init__(self, parent=None, authenticated=True, with_events=True):
         super().__init__(parent)
-        self._events = make_fake_events()
+        self._events = make_fake_events() if with_events else []
         self._authenticated = authenticated
 
     @property
@@ -240,6 +241,34 @@ def _build_main_window():
     return win
 
 
+def _build_calendar_main(mode="month", with_events=True):
+    """主視窗（日曆頁）：以假 store 推送行程與同步狀態。"""
+    from ui.main_window import MainWindow
+    store = FakeStore(with_events=with_events)
+    win = MainWindow(FakeConfig(), store)
+    win.sidebar.set_countdown(8 * 60 + 42)
+    store.events_changed.emit(store.events())
+    store.sync_state_changed.emit("ok", "已同步")
+    win.calendar_view.set_view_mode(mode)
+    return win
+
+
+def build_main_month():
+    return _build_calendar_main("month")
+
+
+def build_main_week():
+    return _build_calendar_main("week")
+
+
+def build_main_day():
+    return _build_calendar_main("day")
+
+
+def build_main_month_empty():
+    return _build_calendar_main("month", with_events=False)
+
+
 def build_main_shell():
     return _build_main_window()
 
@@ -256,11 +285,16 @@ SCREENS = {
     "main_shell_1180x740": (build_main_shell, theme.WINDOW_W, theme.WINDOW_H),
     "main_shell_960x620": (build_main_shell, theme.WINDOW_MIN_W, theme.WINDOW_MIN_H),
     "main_water": (build_main_water, theme.WINDOW_W, theme.WINDOW_H),
+    "main_month_1180x740": (build_main_month, theme.WINDOW_W, theme.WINDOW_H),
+    "main_month_960x620": (build_main_month, theme.WINDOW_MIN_W, theme.WINDOW_MIN_H),
+    "main_week": (build_main_week, theme.WINDOW_W, theme.WINDOW_H),
+    "main_day": (build_main_day, theme.WINDOW_W, theme.WINDOW_H),
+    "main_month_empty": (build_main_month_empty, theme.WINDOW_W, theme.WINDOW_H),
 }
 
 # TODO（後續批次補上）：
 TODO_SCREENS = [
-    "main_month_1180x740", "main_month_960x620", "main_week", "main_day", "settings",
+    "settings",
     "dialog_new", "dialog_edit", "dialog_allday", "confirm_delete",
     "toast_water", "toast_danger", "tray_menu",
 ]

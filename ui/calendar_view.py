@@ -1,477 +1,227 @@
 """
 ui/calendar_view.py
-日曆與近期提醒儀表板 (Calendar Dashboard View) - 包含 100% 依字數自適應高度與標題/地點/備註獨立三行卡片
+日曆頁：工具列（標題 / 導覽 / 月週日切換 / 同步狀態 / 新增）+ 月格或時間軸 + 右側面板。
+
+資料來源是 EventStore（events_changed 推送完整清單）；本頁不直接碰網路。
+樣式一律來自 ui/styles.py 全域 QSS（Toolbar、CalendarSurface、SidePanel…）。
 """
 
-import html
-from PyQt6.QtCore import Qt, QDate, QTimer
-from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QCalendarWidget, QLabel,
-    QPushButton, QScrollArea, QFrame, QSizePolicy, QHeaderView, QTableView, QMessageBox
-)
-from PyQt6.QtGui import QFont, QColor, QPalette, QTextCharFormat
+from datetime import date
 
+from PyQt6.QtCore import QDate, QSize, Qt, QTimer
+from PyQt6.QtGui import QFontMetrics
+from PyQt6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton,
+                             QSizePolicy, QStackedWidget, QVBoxLayout, QWidget)
+
+from ui import calendar_logic as cl
+from ui import icons, theme
 from ui.calendar_dialog import CalendarDialog
+from ui.components import IconButton, SegmentedControl, SyncStatusBadge
+from ui.month_grid import MonthGrid
+from ui.side_panel import SidePanel
+from ui.styles import make_font
+from ui.time_grid import TimeGrid
 from utils.logger import get_logger
-from utils.paths import asset_path, qss_url
 
 logger = get_logger(__name__)
+
+_VIEW_OPTIONS = [(cl.VIEW_MONTH, "月"), (cl.VIEW_WEEK, "週"), (cl.VIEW_DAY, "日")]
+_PREV_TIPS = {cl.VIEW_MONTH: "上個月", cl.VIEW_WEEK: "上一週", cl.VIEW_DAY: "前一天"}
+_NEXT_TIPS = {cl.VIEW_MONTH: "下個月", cl.VIEW_WEEK: "下一週", cl.VIEW_DAY: "後一天"}
+
+
+def _to_qdate(d):
+    return QDate(d.year, d.month, d.day)
+
 
 class CalendarView(QWidget):
     def __init__(self, event_store, parent=None):
         super().__init__(parent)
 
         self.event_store = event_store
-        # store 推來的事件複本；QDate 另存於 _qdate_start/_qdate_end，不寫回 store 的 dict
+        # store 推來的事件複本；QDate 另存於 _qdate_start/_qdate_end（date 另存於 _d_start/_d_end），
+        # 不寫回 store 的 dict
         self._events = []
+        self._today = date.today            # 可注入，方便測試
+        self._selected = self._today()
+        self._view_mode = cl.VIEW_MONTH
+        self._ensured_key = None
 
         self.init_ui()
-        self.customize_calendar_internals()
 
         self.event_store.events_changed.connect(self.on_events_changed)
         self.event_store.sync_state_changed.connect(self.on_sync_state_changed)
-        self.calendar.currentPageChanged.connect(
-            lambda y, m: self.event_store.ensure_month(y, m)
-        )
 
         # 每 60 秒背景非同步靜默刷新 Google 日曆
         self.sync_timer = QTimer(self)
         self.sync_timer.timeout.connect(self.sync_google_events)
         self.sync_timer.start(60000)
 
-        # 設定目前顯示月份的拉取範圍（未授權時只記錄範圍，不送網路）
-        today = QDate.currentDate()
-        self.event_store.ensure_month(today.year(), today.month())
+        self._refresh_all()
+
+    # ------------------------------------------------------------ 版面
 
     def init_ui(self):
-        self.setStyleSheet("""
-            QWidget#CalendarView {
-                background-color: #121217;
-                color: #ffffff;
-            }
-            
-            /* 中間日曆卡片 (#1c1c24 底色) */
-            QCalendarWidget {
-                background-color: #1c1c24;
-                border: 1px solid #2a2a36;
-                border-radius: 16px;
-                min-height: 380px;
-            }
-            
-            /* 頂部年月導覽列 */
-            QCalendarWidget QWidget#qt_calendar_navigationbar {
-                background-color: #1c1c24;
-                border-bottom: 1px solid #2a2a36;
-                border-top-left-radius: 16px;
-                border-top-right-radius: 16px;
-                min-height: 52px;
-            }
-            QCalendarWidget QToolButton {
-                color: #a0a0ab;
-                font-size: 14.5px;
-                font-weight: bold;
-                font-family: 'Segoe UI', 'Microsoft JhengHei UI', sans-serif;
-                border-radius: 8px;
-                padding: 6px 14px;
-                margin: 2px;
-                background-color: transparent;
-                border: none;
-            }
-            QCalendarWidget QToolButton:hover {
-                background-color: #2a2a36;
-                color: #8b5cf6;
-            }
-            QCalendarWidget QSpinBox {
-                background-color: #121217;
-                color: #ffffff;
-                border: 1px solid #2a2a36;
-                border-radius: 8px;
-                font-weight: bold;
-                font-size: 14px;
-                padding: 4px 34px 4px 10px;
-                min-height: 36px;
-            }
-            QCalendarWidget QSpinBox::up-button {
-                subcontrol-origin: border;
-                subcontrol-position: top right;
-                width: 28px;
-                height: 17px;
-                background-color: #2a2a36;
-                border-top-right-radius: 7px;
-                margin: 1px 1px 0px 0px;
-            }
-            QCalendarWidget QSpinBox::up-button:hover {
-                background-color: #8b5cf6;
-            }
-            QCalendarWidget QSpinBox::up-arrow {
-                image: url("__ARROW_UP__");
-                width: 12px;
-                height: 12px;
-            }
-            QCalendarWidget QSpinBox::down-button {
-                subcontrol-origin: border;
-                subcontrol-position: bottom right;
-                width: 28px;
-                height: 17px;
-                background-color: #2a2a36;
-                border-bottom-right-radius: 7px;
-                margin: 0px 1px 1px 0px;
-            }
-            QCalendarWidget QSpinBox::down-button:hover {
-                background-color: #8b5cf6;
-            }
-            QCalendarWidget QSpinBox::down-arrow {
-                image: url("__ARROW_DOWN__");
-                width: 12px;
-                height: 12px;
-            }
-            QCalendarWidget QMenu {
-                background-color: #1c1c24;
-                color: #ffffff;
-                border: 1px solid #2a2a36;
-                border-radius: 8px;
-            }
-            
-            /* 星期表頭 (日 一 二 三 四 五 六) */
-            QCalendarWidget QHeaderView {
-                background-color: #1c1c24;
-                border: none;
-            }
-            QCalendarWidget QHeaderView::section {
-                background-color: #1c1c24;
-                color: #ffffff;
-                font-weight: bold;
-                font-size: 13px;
-                font-family: 'Segoe UI', 'Microsoft JhengHei UI', sans-serif;
-                border: none;
-                padding: 10px 0px;
-            }
-            
-            /* 日期表格主體 */
-            QCalendarWidget QTableView {
-                background-color: #1c1c24;
-                border-bottom-left-radius: 16px;
-                border-bottom-right-radius: 16px;
-                selection-background-color: transparent;
-                outline: 0;
-            }
-            QCalendarWidget QAbstractItemView:enabled {
-                color: #ffffff;
-                font-size: 14px;
-                font-weight: 600;
-                font-family: 'Segoe UI', 'Microsoft JhengHei UI', sans-serif;
-                selection-background-color: #8b5cf6;
-                selection-color: #ffffff;
-            }
-            
-            /* 全寬大紫光「+ 新增行程」按鈕 */
-            QPushButton#AddEventBtn {
-                background-color: #8b5cf6;
-                color: #ffffff;
-                font-weight: 700;
-                font-size: 14px;
-                border: none;
-                border-radius: 12px;
-                padding: 12px 20px;
-            }
-            QPushButton#AddEventBtn:hover {
-                background-color: #7c3aed;
-            }
-
-            /* 右側頂點按鈕與同步鈕 */
-            QPushButton#SyncGoogleBtn {
-                background-color: #1c1c24;
-                color: #8b5cf6;
-                font-weight: 700;
-                font-size: 11.5px;
-                border: 1px solid rgba(139, 92, 246, 0.5);
-                border-radius: 7px;
-                padding: 5px 10px;
-            }
-            QPushButton#SyncGoogleBtn:hover {
-                background-color: #8b5cf6;
-                color: #ffffff;
-            }
-            QPushButton#TimeBtnActive {
-                background-color: #8b5cf6;
-                color: #ffffff;
-                font-weight: 700;
-                font-size: 11.5px;
-                border: none;
-                border-radius: 7px;
-                padding: 5px 10px;
-            }
-            QPushButton#GridBtnOutline {
-                background-color: #1c1c24;
-                color: #a0a0ab;
-                font-weight: 600;
-                font-size: 11.5px;
-                border: 1px solid #2a2a36;
-                border-radius: 7px;
-                padding: 5px 10px;
-            }
-            QPushButton#TodayNavBtn {
-                background-color: transparent;
-                color: #8b5cf6;
-                font-weight: 600;
-                font-size: 11.5px;
-                border: 1px solid rgba(139, 92, 246, 0.4);
-                border-radius: 7px;
-                padding: 4px 8px;
-            }
-            
-            QFrame#SidebarFrame {
-                background-color: #16161e;
-                border: 1px solid #23232e;
-                border-radius: 18px;
-            }
-            QLabel#SidebarTitle {
-                color: #ffffff;
-                font-size: 16px;
-                font-weight: 800;
-                font-family: 'Segoe UI', 'Microsoft JhengHei UI', sans-serif;
-            }
-            
-            QScrollBar:vertical {
-                border: none;
-                background: transparent;
-                width: 5px;
-                border-radius: 2px;
-            }
-            QScrollBar::handle:vertical {
-                background: #2a2a36;
-                border-radius: 2px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: #8b5cf6;
-            }
-        """.replace("__ARROW_UP__", qss_url(asset_path("arrow_up.png")))
-           .replace("__ARROW_DOWN__", qss_url(asset_path("arrow_down.png"))))
         self.setObjectName("CalendarView")
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        root.addWidget(self._build_toolbar())
 
-        main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(0)
+        body = QHBoxLayout()
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
 
-        # ----------------------------------------------------
-        # 1. 中間區域：日曆與當日行程
-        # ----------------------------------------------------
-        middle_box = QVBoxLayout()
-        middle_box.setSpacing(14)
+        surface = QFrame(self)
+        surface.setObjectName("CalendarSurface")
+        surface.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        surface.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        surface_layout = QVBoxLayout(surface)
+        surface_layout.setContentsMargins(theme.SPACE_4, theme.SPACE_3, theme.SPACE_4, theme.SPACE_4)
+        self.view_stack = QStackedWidget(surface)
+        self.month_grid = MonthGrid(self.view_stack)
+        self.time_grid = TimeGrid(self.view_stack)
+        self.view_stack.addWidget(self.month_grid)   # 0 = 月
+        self.view_stack.addWidget(self.time_grid)    # 1 = 週 / 日
+        surface_layout.addWidget(self.view_stack)
+        body.addWidget(surface, 1)
 
-        header_lbl = QLabel("今日行程", self)
-        header_lbl.setStyleSheet("font-size: 20px; font-weight: 800; color: #ffffff;")
-        middle_box.addWidget(header_lbl)
+        self.side_panel = SidePanel(self)
+        body.addWidget(self.side_panel)
+        root.addLayout(body, 1)
 
-        center_h_layout = QHBoxLayout()
-        center_h_layout.setContentsMargins(0, 0, 0, 0)
-        center_h_layout.addStretch(1)
+        self.month_grid.date_selected.connect(self.set_selected_date)
+        self.month_grid.date_activated.connect(self._add_event_on)
+        self.month_grid.event_activated.connect(self.on_edit_event)
+        self.time_grid.date_selected.connect(self.set_selected_date)
+        self.time_grid.date_activated.connect(self._add_event_on)
+        self.time_grid.event_activated.connect(self.on_edit_event)
+        self.side_panel.event_activated.connect(self.on_edit_event)
 
-        calendar_col = QVBoxLayout()
-        calendar_col.setSpacing(14)
+    def _build_toolbar(self):
+        bar = QFrame(self)
+        bar.setObjectName("Toolbar")
+        bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(theme.SPACE_4, theme.SPACE_3, theme.SPACE_4, theme.SPACE_3)
+        layout.setSpacing(theme.SPACE_2)
+        self.toolbar = bar
 
-        self.calendar = QCalendarWidget(self)
-        self.calendar.setFixedWidth(440)
-        self.calendar.setMinimumHeight(380)
-        self.calendar.setGridVisible(False)
-        self.calendar.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
-        
-        purple_fmt = QTextCharFormat()
-        purple_fmt.setForeground(QColor("#8b5cf6"))
-        purple_fmt.setFontWeight(QFont.Weight.Bold)
-        self.calendar.setWeekdayTextFormat(Qt.DayOfWeek.Sunday, purple_fmt)
-        self.calendar.setWeekdayTextFormat(Qt.DayOfWeek.Saturday, purple_fmt)
+        self.title_label = QLabel("")
+        self.title_label.setObjectName("ToolbarTitle")
+        self._title_metrics = QFontMetrics(make_font(theme.FONT_LG, theme.WEIGHT_SEMIBOLD))
+        self._reserve_title_width(self._view_mode)
+        layout.addWidget(self.title_label)
 
-        self.calendar.selectionChanged.connect(self.on_date_selected)
-        calendar_col.addWidget(self.calendar)
+        self.btn_prev = IconButton("chevron-left", _PREV_TIPS[self._view_mode])
+        self.btn_next = IconButton("chevron-right", _NEXT_TIPS[self._view_mode])
+        self.btn_prev.clicked.connect(lambda: self.navigate(-1))
+        self.btn_next.clicked.connect(lambda: self.navigate(1))
+        layout.addWidget(self.btn_prev)
+        layout.addWidget(self.btn_next)
 
-        add_btn = QPushButton("+ 新增行程", self)
-        add_btn.setObjectName("AddEventBtn")
-        add_btn.setFixedWidth(440)
-        add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        add_btn.clicked.connect(self.on_add_event_clicked)
-        calendar_col.addWidget(add_btn)
+        self.btn_today = QPushButton("今天")
+        self.btn_today.setProperty("variant", "secondary")
+        self.btn_today.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_today.clicked.connect(self.go_today)
+        layout.addWidget(self.btn_today)
 
-        self.today_events_card = QFrame(self)
-        self.today_events_card.setFixedWidth(440)
-        self.today_events_card.setStyleSheet("""
-            QFrame {
-                background-color: #1c1c24;
-                border: 1px solid #2a2a36;
-                border-radius: 14px;
-                padding: 12px;
-            }
-        """)
-        card_layout = QVBoxLayout(self.today_events_card)
-        card_layout.setContentsMargins(12, 12, 12, 12)
-        card_layout.setSpacing(10)
+        layout.addStretch(1)
 
-        self.selected_date_lbl = QLabel("📌 選取日期行程", self.today_events_card)
-        self.selected_date_lbl.setStyleSheet("font-size: 14px; font-weight: 700; color: #8b5cf6;")
-        card_layout.addWidget(self.selected_date_lbl)
+        self.view_seg = SegmentedControl(_VIEW_OPTIONS)
+        self.view_seg.set_current(self._view_mode)
+        self.view_seg.changed.connect(self.set_view_mode)
+        layout.addWidget(self.view_seg)
 
-        self.date_events_area = QScrollArea(self.today_events_card)
-        self.date_events_area.setWidgetResizable(True)
-        self.date_events_area.setMinimumHeight(120)
-        self.date_events_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.date_events_area.setStyleSheet("border: none; background: transparent;")
-        
-        self.date_events_widget = QWidget()
-        self.date_events_layout = QVBoxLayout(self.date_events_widget)
-        self.date_events_layout.setContentsMargins(0, 0, 0, 0)
-        self.date_events_layout.setSpacing(8)
-        self.date_events_area.setWidget(self.date_events_widget)
-
-        card_layout.addWidget(self.date_events_area)
-        calendar_col.addWidget(self.today_events_card)
-
-        center_h_layout.addLayout(calendar_col)
-        center_h_layout.addStretch(1)
-
-        middle_box.addLayout(center_h_layout)
-        middle_box.addStretch(1)
-
-        main_layout.addLayout(middle_box, stretch=1)
-
-        # ----------------------------------------------------
-        # 2. 右側區域：提醒面板 (340px 寬，雙行頂部導覽按鈕列)
-        # ----------------------------------------------------
-        right_container = QWidget(self)
-        right_container.setFixedWidth(340)
-
-        right_box = QVBoxLayout(right_container)
-        right_box.setContentsMargins(0, 0, 0, 0)
-        right_box.setSpacing(8)
-
-        top_nav_row1 = QHBoxLayout()
-        top_nav_row1.setContentsMargins(0, 0, 0, 0)
-        top_nav_row1.setSpacing(6)
-
-        self.date_header_title = QLabel("📅 2026/08/09 (週日)", right_container)
-        self.date_header_title.setStyleSheet("font-size: 14px; font-weight: 800; color: #ffffff;")
-        top_nav_row1.addWidget(self.date_header_title)
-
-        prev_btn = QPushButton("‹", right_container)
-        prev_btn.setFixedSize(24, 24)
-        prev_btn.setStyleSheet("color: #ffffff; font-size: 15px; background-color: #1c1c24; border: 1px solid #2a2a36; border-radius: 6px;")
-        prev_btn.clicked.connect(lambda: self.calendar.setSelectedDate(self.calendar.selectedDate().addDays(-1)))
-        top_nav_row1.addWidget(prev_btn)
-
-        next_btn = QPushButton("›", right_container)
-        next_btn.setFixedSize(24, 24)
-        next_btn.setStyleSheet("color: #ffffff; font-size: 15px; background-color: #1c1c24; border: 1px solid #2a2a36; border-radius: 6px;")
-        next_btn.clicked.connect(lambda: self.calendar.setSelectedDate(self.calendar.selectedDate().addDays(1)))
-        top_nav_row1.addWidget(next_btn)
-
-        today_btn = QPushButton("回到今天", right_container)
-        today_btn.setObjectName("TodayNavBtn")
-        today_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        today_btn.clicked.connect(lambda: self.calendar.setSelectedDate(QDate.currentDate()))
-        top_nav_row1.addWidget(today_btn)
-
-        top_nav_row1.addStretch(1)
-        right_box.addLayout(top_nav_row1)
-
-        top_nav_row2 = QHBoxLayout()
-        top_nav_row2.setContentsMargins(0, 0, 0, 0)
-        top_nav_row2.setSpacing(8)
-
-        self.sync_btn = QPushButton("🔄 雲端同步", right_container)
-        self.sync_btn.setObjectName("SyncGoogleBtn")
-        self.sync_btn.setToolTip("手動非同步同步 Google 日曆最新行程")
-        self.sync_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sync_btn = SyncStatusBadge()
+        self.sync_btn.setToolTip("同步 Google 日曆")
         self.sync_btn.clicked.connect(self.on_sync_clicked)
-        top_nav_row2.addWidget(self.sync_btn)
+        layout.addWidget(self.sync_btn)
 
-        top_nav_row2.addStretch(1)
+        self.btn_add = QPushButton("新增")
+        self.btn_add.setProperty("variant", "primary")
+        self.btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_add.setIcon(icons.icon("plus", theme.TEXT_ON_ACCENT, theme.ICON_SM))
+        self.btn_add.setIconSize(QSize(theme.ICON_SM, theme.ICON_SM))
+        self.btn_add.clicked.connect(self.on_add_event_clicked)
+        layout.addWidget(self.btn_add)
+        return bar
 
-        time_btn = QPushButton("≡ 日時間軸", right_container)
-        time_btn.setObjectName("TimeBtnActive")
-        top_nav_row2.addWidget(time_btn)
+    # ------------------------------------------------------------ 視圖狀態
 
-        grid_btn = QPushButton("▦ 月網格", right_container)
-        grid_btn.setObjectName("GridBtnOutline")
-        top_nav_row2.addWidget(grid_btn)
+    def selected_date(self):
+        return self._selected
 
-        right_box.addLayout(top_nav_row2)
+    def view_mode(self):
+        return self._view_mode
 
-        sidebar_frame = QFrame(right_container)
-        sidebar_frame.setObjectName("SidebarFrame")
+    def set_selected_date(self, day):
+        if day == self._selected:
+            return
+        self._selected = day
+        self._refresh_all()
 
-        sidebar_layout = QVBoxLayout(sidebar_frame)
-        sidebar_layout.setContentsMargins(14, 14, 14, 14)
-        sidebar_layout.setSpacing(10)
+    def set_view_mode(self, mode):
+        if mode not in (cl.VIEW_MONTH, cl.VIEW_WEEK, cl.VIEW_DAY):
+            logger.warning(f"未知的視圖模式: {mode!r}")
+            return
+        self._view_mode = mode
+        self.view_seg.set_current(mode)      # 程式呼叫時同步分段鈕（不發 signal）
+        self._refresh_all()
 
-        sb_header = QHBoxLayout()
-        sb_title = QLabel("🔔 近期倒數提醒", sidebar_frame)
-        sb_title.setObjectName("SidebarTitle")
-        sb_header.addWidget(sb_title)
-        sb_header.addStretch(1)
+    def navigate(self, step):
+        self.set_selected_date(cl.shift_anchor(self._selected, self._view_mode, step))
 
-        rule_badge = QLabel("等級過濾", sidebar_frame)
-        rule_badge.setStyleSheet("""
-            background-color: rgba(139, 92, 246, 0.15);
-            color: #a78bfa;
-            border: 1px solid rgba(139, 92, 246, 0.3);
-            border-radius: 10px;
-            padding: 2px 7px;
-            font-size: 10.5px;
-            font-weight: 600;
-        """)
-        sb_header.addWidget(rule_badge)
-        sidebar_layout.addLayout(sb_header)
+    def go_today(self):
+        self.set_selected_date(self._today())
 
-        legend_layout = QHBoxLayout()
-        legend_layout.setSpacing(4)
-        
-        leg_items = [("🔴大:30天", "#f43f5e"), ("🟡中:7天", "#f59e0b"), ("🟢小:3天", "#10b981")]
-        for text, color in leg_items:
-            lbl = QLabel(text, sidebar_frame)
-            lbl.setStyleSheet(f"color: {color}; font-size: 10.5px; font-weight: 600;")
-            legend_layout.addWidget(lbl)
-        legend_layout.addStretch(1)
+    def _reserve_title_width(self, mode):
+        """依視圖模式預留該模式可能出現的最長標題寬度：連點 ‹ › 時按鈕不跳動，又不浪費空間。"""
+        width = max(self._title_metrics.horizontalAdvance(t) for t in cl.title_width_samples(mode))
+        self.title_label.setMinimumWidth(width)
 
-        sidebar_layout.addLayout(legend_layout)
+    def _refresh_all(self):
+        mode, sel = self._view_mode, self._selected
+        dates = cl.view_dates(mode, sel)
+        self._reserve_title_width(mode)
+        self.title_label.setText(cl.format_view_title(mode, sel, dates))
+        self.btn_prev.setToolTip(_PREV_TIPS[mode])
+        self.btn_next.setToolTip(_NEXT_TIPS[mode])
+        if mode == cl.VIEW_MONTH:
+            self.month_grid.set_month(sel.year, sel.month)
+            self.month_grid.set_selected(sel)
+            self.view_stack.setCurrentWidget(self.month_grid)
+        else:
+            self.time_grid.set_days(dates)
+            self.time_grid.set_selected(sel)
+            self.view_stack.setCurrentWidget(self.time_grid)
+        self._refresh_data_views()
+        self._ensure_visible_months(dates)
 
-        self.sidebar_scroll = QScrollArea(sidebar_frame)
-        self.sidebar_scroll.setWidgetResizable(True)
-        self.sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.sidebar_scroll.setStyleSheet("border: none; background: transparent;")
+    def _refresh_data_views(self):
+        """把 _events 推給目前的視圖與側欄。"""
+        today = self._today()
+        if self._view_mode == cl.VIEW_MONTH:
+            self.month_grid.set_events(self._events)
+        else:
+            self.time_grid.set_events(self._events)
+        self.side_panel.set_upcoming(cl.upcoming(self._events, today))
+        self.side_panel.set_selected_day(self._selected, cl.events_on(self._events, self._selected), today)
 
-        self.sidebar_content_widget = QWidget()
-        self.sidebar_content_layout = QVBoxLayout(self.sidebar_content_widget)
-        self.sidebar_content_layout.setContentsMargins(0, 0, 0, 0)
-        self.sidebar_content_layout.setSpacing(8)
-        self.sidebar_scroll.setWidget(self.sidebar_content_widget)
+    def _ensure_visible_months(self, dates):
+        """換範圍時通知 store 拉資料；範圍（anchor 月份）沒變就不重複呼叫。
 
-        sidebar_layout.addWidget(self.sidebar_scroll)
-        right_box.addWidget(sidebar_frame, stretch=1)
+        EventStore.ensure_month 會拉前後各一個月，所以只需指定一個月份：
+        週視圖用該週第一天所在月份（週內點跨月日期不重拉），月 / 日視圖用選取日所在月份。
+        """
+        anchor_day = dates[0] if self._view_mode == cl.VIEW_WEEK else self._selected
+        anchor = (anchor_day.year, anchor_day.month)
+        if anchor == self._ensured_key:
+            return
+        self._ensured_key = anchor
+        self.event_store.ensure_month(*anchor)
 
-        main_layout.addWidget(right_container)
-
-        self.refresh_upcoming_sidebar()
-        self.on_date_selected()
-
-    def customize_calendar_internals(self):
-        try:
-            pal = self.calendar.palette()
-            pal.setColor(QPalette.ColorRole.Base, QColor("#1c1c24"))
-            pal.setColor(QPalette.ColorRole.Window, QColor("#1c1c24"))
-            pal.setColor(QPalette.ColorRole.AlternateBase, QColor("#1c1c24"))
-            pal.setColor(QPalette.ColorRole.Text, QColor("#ffffff"))
-            pal.setColor(QPalette.ColorRole.WindowText, QColor("#ffffff"))
-            pal.setColor(QPalette.ColorRole.Highlight, QColor("#8b5cf6"))
-            pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
-            self.calendar.setPalette(pal)
-
-            for child in self.calendar.findChildren(QWidget):
-                child.setPalette(pal)
-                if isinstance(child, QHeaderView) or child.inherits("QHeaderView"):
-                    child.setStyleSheet("background-color: #1c1c24; color: #ffffff; border: none;")
-                elif isinstance(child, QTableView) or child.inherits("QTableView") or "CalendarView" in child.metaObject().className():
-                    child.setStyleSheet("background-color: #1c1c24; color: #ffffff; selection-background-color: #8b5cf6;")
-        except Exception as e:
-            logger.warning(f"樣式覆蓋: {e}")
+    # ------------------------------------------------------------ 同步
 
     def sync_google_events(self):
         """60 秒計時器用：未授權時靜默略過"""
@@ -488,280 +238,40 @@ class CalendarView(QWidget):
         QMessageBox.information(self, "尚未連線", message)
 
     def on_sync_state_changed(self, state, message):
-        if state == "syncing":
-            self.sync_btn.setText("🔄 同步中...")
-            self.sync_btn.setToolTip("同步中")
-        elif state in ("error", "offline"):
-            self.sync_btn.setText("⚠️ 同步失敗")
-            self.sync_btn.setToolTip(message)
-        else:
-            self.sync_btn.setText("🔄 雲端同步")
-            self.sync_btn.setToolTip("手動非同步同步 Google 日曆最新行程")
+        self.sync_btn.set_state(state, message)
+
+    # ------------------------------------------------------------ 資料
 
     def on_events_changed(self, events):
         """store 推送完整事件清單（含空清單，需清空並重繪）"""
         self._events = []
         for ev in events:
             try:
-                item = dict(ev)
-                start_d = QDate.fromString(str(item["start"])[:10], "yyyy-MM-dd")
-                end_d = QDate.fromString(str(item.get("end") or item["start"])[:10], "yyyy-MM-dd")
-                if not start_d.isValid():
+                span = cl.parse_event_dates(ev)
+                if span is None:
                     continue
-                if not end_d.isValid() or end_d < start_d:
-                    end_d = start_d
-                elif (
-                    not item.get("all_day")
-                    and str(item.get("end", ""))[11:19] == "00:00:00"
-                    and end_d > start_d
-                ):
-                    # 定時行程剛好結束於隔天 00:00 → 實際只到前一天，不佔隔天
-                    end_d = end_d.addDays(-1)
-                item["_qdate_start"] = start_d
-                item["_qdate_end"] = end_d
+                item = dict(ev)
+                item["_d_start"], item["_d_end"] = span
+                item["_qdate_start"] = _to_qdate(span[0])
+                item["_qdate_end"] = _to_qdate(span[1])
                 self._events.append(item)
             except Exception:
                 logger.exception("解析行程時間失敗")
-        self.refresh_upcoming_sidebar()
-        self.on_date_selected()
+        self._refresh_data_views()
 
-    @staticmethod
-    def _time_text(evt):
-        """卡片時間顯示：全天顯示「全天」，定時顯示 HH:MM - HH:MM（naive 本機時間字串）"""
-        if evt.get("all_day"):
-            return "全天"
-        start = str(evt.get("start", ""))
-        end = str(evt.get("end", ""))
-        start_t = start[11:16] if len(start) >= 16 else ""
-        end_t = end[11:16] if len(end) >= 16 else ""
-        if start_t and end_t:
-            return f"{start_t} - {end_t}"
-        return start_t or end_t
-
-    def refresh_upcoming_sidebar(self):
-        while self.sidebar_content_layout.count():
-            item = self.sidebar_content_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
-        today = QDate.currentDate()
-        upcoming_items = []
-
-        for evt in self._events:
-            # 已結束的行程不顯示；進行中的（跨日）視為今天
-            if evt["_qdate_end"] < today:
-                continue
-            days_diff = max(0, today.daysTo(evt["_qdate_start"]))
-
-            prio = evt.get("priority", "minor")
-            show = False
-            if prio == "major" and days_diff <= 30:
-                show = True
-            elif prio == "medium" and days_diff <= 7:
-                show = True
-            elif prio == "minor" and days_diff <= 3:
-                show = True
-
-            if show:
-                upcoming_items.append((evt, days_diff))
-
-        upcoming_items.sort(key=lambda x: x[1])
-
-        if not upcoming_items:
-            empty_box = QVBoxLayout()
-            empty_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            
-            icon_lbl = QLabel("✨", self)
-            icon_lbl.setFont(QFont("Segoe UI Emoji", 24))
-            icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            empty_box.addWidget(icon_lbl)
-
-            no_lbl = QLabel("目前無近期需提醒事項", self)
-            no_lbl.setStyleSheet("color: #a0a0ab; font-size: 12px; text-align: center; margin-top: 4px;")
-            no_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            empty_box.addWidget(no_lbl)
-
-            w = QWidget()
-            w.setLayout(empty_box)
-            self.sidebar_content_layout.addWidget(w)
-        else:
-            for evt, days_diff in upcoming_items:
-                card = self.create_event_card(evt, days_diff)
-                self.sidebar_content_layout.addWidget(card)
-
-        self.sidebar_content_layout.addStretch(1)
-
-    def create_event_card(self, evt, days_diff):
-        card = QFrame(self)
-        card.setCursor(Qt.CursorShape.PointingHandCursor)
-        card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-
-        prio = evt.get("priority", "minor")
-        if prio == "major":
-            badge_text = "● 大事件 · 提前30天"
-            badge_color = "#f43f5e"
-            border_css = "border: 1px solid rgba(244, 63, 94, 0.4);"
-            bg_css = "background-color: #1c1c24;"
-        elif prio == "medium":
-            badge_text = "● 中事件 · 提前7天"
-            badge_color = "#f59e0b"
-            border_css = "border: 1px solid rgba(245, 158, 11, 0.4);"
-            bg_css = "background-color: #1c1c24;"
-        else:
-            badge_text = "● 小事件 · 提前3天"
-            badge_color = "#10b981"
-            border_css = "border: 1px solid rgba(16, 185, 129, 0.4);"
-            bg_css = "background-color: #1c1c24;"
-
-        card.setStyleSheet(f"""
-            QFrame {{
-                {bg_css}
-                {border_css}
-                border-radius: 12px;
-            }}
-            QFrame:hover {{
-                border-color: #8b5cf6;
-                background-color: #23232e;
-            }}
-        """)
-
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(10, 8, 10, 8)
-        layout.setSpacing(5)
-
-        top_h = QHBoxLayout()
-        badge = QLabel(badge_text, card)
-        badge.setStyleSheet(f"color: {badge_color}; font-weight: 700; font-size: 10.5px; border: none; background: transparent;")
-        top_h.addWidget(badge)
-        top_h.addStretch(1)
-
-        countdown_str = "🔥 今天到期" if days_diff == 0 else f"⏳ 剩餘 {days_diff} 天"
-        cnt_lbl = QLabel(countdown_str, card)
-        cnt_lbl.setStyleSheet("""
-            background-color: #2a2a36;
-            color: #ffffff;
-            font-weight: 700;
-            font-size: 10.5px;
-            border-radius: 5px;
-            padding: 2px 5px;
-            border: none;
-        """)
-        top_h.addWidget(cnt_lbl)
-        layout.addLayout(top_h)
-
-        title_lbl = QLabel(evt["title"], card)
-        title_lbl.setTextFormat(Qt.TextFormat.PlainText)
-        title_lbl.setWordWrap(True)
-        title_lbl.setStyleSheet("color: #ffffff; font-weight: 700; font-size: 13px; border: none; background: transparent;")
-        layout.addWidget(title_lbl)
-
-        date_str = evt["_qdate_start"].toString("yyyy/MM/dd (ddd)")
-        date_lbl = QLabel(f"📅 {date_str}  {self._time_text(evt)}", card)
-        date_lbl.setTextFormat(Qt.TextFormat.PlainText)
-        date_lbl.setWordWrap(True)
-        date_lbl.setStyleSheet("color: #a0a0ab; font-size: 10.5px; border: none; background: transparent;")
-        layout.addWidget(date_lbl)
-
-        if evt.get("location"):
-            loc_lbl = QLabel(f"📍 {evt['location']}", card)
-            loc_lbl.setTextFormat(Qt.TextFormat.PlainText)
-            loc_lbl.setWordWrap(True)
-            loc_lbl.setStyleSheet("color: #71717a; font-size: 10.5px; border: none; background: transparent;")
-            layout.addWidget(loc_lbl)
-
-        card.mousePressEvent = lambda event, e=evt: self.on_edit_event(e)
-        return card
-
-    def create_today_event_card(self, evt):
-        """建立當日行程列表卡片 (標題/地點/備註三行獨立，100% 依字數自適應高度)"""
-        card = QFrame(self)
-        card.setCursor(Qt.CursorShape.PointingHandCursor)
-        card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-
-        prio = evt.get("priority", "minor")
-        tag_color = "#f43f5e" if prio == "major" else ("#f59e0b" if prio == "medium" else "#10b981")
-
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: #121217;
-                border: 1px solid #2a2a36;
-                border-left: 4px solid {tag_color};
-                border-radius: 10px;
-            }}
-            QFrame:hover {{
-                border-color: #8b5cf6;
-                border-left: 4px solid {tag_color};
-                background-color: #23232e;
-            }}
-        """)
-
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(10, 6, 10, 6)
-        layout.setSpacing(2)
-
-        time_lbl = QLabel(f"🕒 {self._time_text(evt)}", card)
-        time_lbl.setTextFormat(Qt.TextFormat.PlainText)
-        time_lbl.setStyleSheet("color: #8b5cf6; font-size: 11.5px; font-weight: 600; border: none; background: transparent; margin: 0; padding: 0;")
-        layout.addWidget(time_lbl)
-
-        # 第一行：行程標題 (獨立一行，長字串自動折行)
-        title_html = f'<div style="word-break: break-all; color: #ffffff; font-weight: 700; font-size: 13px; line-height: 1.3;">📌  {html.escape(evt.get("title", "無標題"))}</div>'
-        title_lbl = QLabel(title_html, card)
-        title_lbl.setWordWrap(True)
-        title_lbl.setStyleSheet("border: none; background: transparent; margin: 0; padding: 0;")
-        layout.addWidget(title_lbl)
-
-        # 第二行：地點 (若有填寫，獨立一行，不與標題搶位置)
-        if evt.get("location"):
-            loc_html = f'<div style="word-break: break-all; color: #a0a0ab; font-size: 11.5px; line-height: 1.3;">📍  {html.escape(evt["location"])}</div>'
-            loc_lbl = QLabel(loc_html, card)
-            loc_lbl.setWordWrap(True)
-            loc_lbl.setStyleSheet("border: none; background: transparent; margin: 0; padding: 0;")
-            layout.addWidget(loc_lbl)
-
-        # 第三行：備註資訊 (若有填寫，獨立一行，長字串自動折行)
-        if evt.get("notes"):
-            notes_html = f'<div style="word-break: break-all; color: #8b8b9e; font-size: 11.5px; line-height: 1.3;">📝  {html.escape(evt["notes"])}</div>'
-            notes_lbl = QLabel(notes_html, card)
-            notes_lbl.setWordWrap(True)
-            notes_lbl.setStyleSheet("border: none; background: transparent; margin: 0; padding: 0;")
-            layout.addWidget(notes_lbl)
-
-        card.mousePressEvent = lambda event, e=evt: self.on_edit_event(e)
-        return card
-
-    def on_date_selected(self):
-        sel_date = self.calendar.selectedDate()
-        date_str = sel_date.toString("yyyy/MM/dd (ddd)")
-        self.date_header_title.setText(f"📅 {date_str}")
-        self.selected_date_lbl.setText(f"📌 {date_str} 之當日行程")
-
-        while self.date_events_layout.count():
-            item = self.date_events_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
-        date_events = [e for e in self._events if e["_qdate_start"] <= sel_date <= e["_qdate_end"]]
-
-        if not date_events:
-            empty_lbl = QLabel("本日尚未安排任何行程，點擊上方按鈕新增 ➕", self)
-            empty_lbl.setStyleSheet("color: #71717a; font-size: 12px; font-style: italic; margin-top: 4px;")
-            self.date_events_layout.addWidget(empty_lbl)
-        else:
-            for evt in date_events:
-                card = self.create_today_event_card(evt)
-                self.date_events_layout.addWidget(card)
-            # 加上彈性拉伸，確保所有卡片高度 100% 依字數緊縮適應！
-            self.date_events_layout.addStretch(1)
+    # ------------------------------------------------------------ 新增 / 編輯
 
     def on_add_event_clicked(self):
-        dlg = CalendarDialog(self, default_date=self.calendar.selectedDate())
+        self._add_event_on(self._selected)
+
+    def _add_event_on(self, day):
+        dlg = CalendarDialog(parent=self, default_date=_to_qdate(day))
         if dlg.exec() == CalendarDialog.DialogCode.Accepted:
             # 不在本地 append，等 store 寫入成功後以 events_changed 更新
             self.event_store.add_event(dlg.get_data())
 
     def on_edit_event(self, evt):
-        dlg = CalendarDialog(self, event_data=evt)
+        dlg = CalendarDialog(parent=self, event_data=evt)
         res = dlg.exec()
         evt_id = evt.get("id")
         if dlg.is_delete or res == 2:
