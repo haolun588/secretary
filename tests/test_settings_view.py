@@ -58,9 +58,9 @@ def test_water_signal_and_interval_enabled(view):
 def test_autostart_signal(view):
     got = []
     view.autostart_signal.connect(got.append)
-    view.chk_autostart.setChecked(False)
     view.chk_autostart.setChecked(True)
-    assert got == [False, True]
+    view.chk_autostart.setChecked(False)
+    assert got == [True, False]
 
 
 def test_minimize_to_tray_signal(view):

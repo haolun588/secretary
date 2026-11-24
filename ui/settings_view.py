@@ -146,7 +146,7 @@ class SettingsView(QWidget):
 
         # ---- 一般 ----
         self.chk_autostart = _make_switch(self._container)
-        self.chk_autostart.setChecked(True)
+        self.chk_autostart.setChecked(False)
         self.chk_autostart.toggled.connect(self.on_autostart_toggled)
 
         self.chk_minimize_to_tray = _make_switch(self._container)

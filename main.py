@@ -57,16 +57,17 @@ class SecretaryApp:
 
         # 狀態控制變數
         self.water_enabled = self.config.get("water_enabled", True)
-        self.autostart_enabled = self.config.get("autostart", True)
+        self.autostart_enabled = self.config.get("autostart", False)
         self.minimize_to_tray = self.config.get("minimize_to_tray", True)
         self.interval_minutes = self.config.get("interval_minutes", 10)
         self.water = WaterCountdown(self.interval_minutes, enabled=self.water_enabled)
 
-        # 開機自啟動登錄檔同步
-        AutoStartManager.set_autostart(self.autostart_enabled)
-
         # 維護作用中的 Toast 物件引用清單，防記憶體垃圾回收崩潰
         self.toast_stack = ToastStack()
+
+        # 開機自啟動登錄檔同步（僅在與設定不一致時才寫入）
+        if not AutoStartManager.sync(self.autostart_enabled):
+            self._notify_danger("開機自動啟動設定失敗", "無法更新 Windows 開機啟動設定，詳情請見日誌。")
 
         # 行程資料唯一來源；以 app 為 parent，並注入各 view
         self.event_store = EventStore(parent=self.app)
@@ -217,10 +218,16 @@ class SecretaryApp:
         self.save_config()
 
     def on_autostart_toggled(self, enabled):
+        if not AutoStartManager.set_autostart(enabled):
+            self._notify_danger("開機自動啟動設定失敗", "無法更新 Windows 開機啟動設定，詳情請見日誌。")
+            chk = self.window.settings_view.chk_autostart
+            chk.blockSignals(True)
+            chk.setChecked(not enabled)
+            chk.blockSignals(False)
+            return
         self.autostart_enabled = enabled
         self.config["autostart"] = enabled
         self.save_config()
-        AutoStartManager.set_autostart(enabled)
 
     def on_minimize_to_tray_toggled(self, enabled):
         self.minimize_to_tray = enabled

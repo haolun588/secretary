@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 
 DEFAULT_CONFIG = {
     "interval_minutes": 10,
-    "autostart": True,
+    "autostart": False,
     "minimize_to_tray": True,
     "google_account": "",
     "last_updated": ""
