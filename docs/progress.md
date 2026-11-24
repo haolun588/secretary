@@ -106,3 +106,7 @@
 - [ ] `ui/calendar_dialog.py`: 行程新增/編輯對話框新增提醒時間選單（支援自訂多階段提醒）
 - [ ] 跨平台與 Discord 整合相容：相容手機 App、網頁版與桌面端設定之提醒時間，棄用舊 `Calender` 專案獨特標籤，改為統一讀取 Google 原生 `reminders.overrides`
 
+
+## 📌 等級改存 extendedProperties (2026-11-25 完成；未 commit，未對真實 Google 實測)
+- [x] 等級改以 `extendedProperties.private.secretary_priority` 為主，`colorId` 為備援；衝突以 extendedProperties 為準，舊事件不主動補寫（`services/event_mapping.py`：`priority_from_item`、`extended_properties_for`；`to_google_body` 與 `build_patch_body` 同步寫入）
+- 待驗證：`events.patch` 對 `extendedProperties.private` 的 key 合併行為

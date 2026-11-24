@@ -61,7 +61,7 @@ secretary/
 1. **開機靜默啟動與托盤化**：系統開機啟動時 `main.py` 接收 `--minimized`，不呼叫 `window.show()`，直接隱藏於 `QSystemTrayIcon`。
 2. **視窗關閉攔截 (`closeEvent`)**：`MainWindow.closeEvent` 依 config 的 `minimize_to_tray`（設定頁可切換）決定隱藏至托盤或結束。
 3. **托盤右鍵選單**：`ui/tray_menu.py` 建構，含圖示的「顯示主視窗」「測試喝水提醒」「系統與提醒設定」「退出程式」，樣式由全域 QSS 的 QMenu 分段套用。
-4. **Google 日曆與色彩標籤等級**：`services/event_mapping.py` 解析 `colorId`（11、4 大 30 天 / 5、6 中 7 天 / 2、10 小 3 天；未對應視為小事件），顯示為色條與圓點。
+4. **Google 日曆與色彩標籤等級**：`services/event_mapping.py` 以 `extendedProperties.private.secretary_priority` 為主判斷等級，缺少或不合法時以 `colorId` 備援（11、4 大 30 天 / 5、6 中 7 天 / 2、10 小 3 天；未對應視為小事件），顯示為色條與圓點。
 5. **喝水提醒**：`main.py` 每秒 tick `utils/water_timer.WaterCountdown`，到時以 `ToastStack` 顯示 water 樣式 toast（按鈕「延後 10 分鐘」「已喝」）；導覽列底部以 `set_countdown` 顯示剩餘時間。設定頁的測試按鈕只發 `test_toast_requested`，由 `main.py` 顯示 toast，確保仍走堆疊。
 6. **Google 日曆原生多階段提醒 (reminders.overrides)**（Phase 4 規劃中，尚未實作）：透過 `services/event_mapping.py` 傳遞與讀取 API 原生 `reminders`。
 

@@ -12,7 +12,8 @@
 - **定時喝水提醒**：每 N 分鐘（預設 10 分鐘，可透過 UI 調整）於螢幕右下角彈出 toast，提供「延後 10 分鐘」「已喝」按鈕；有按鈕時顯示至少 8 秒，hover 時暫停倒數，之後淡出 (Fade-out)；多則 toast 由 `ToastStack` 堆疊。
 - **Google 日曆整合與色彩標籤等級對應**：
   - 主介面整合日曆，支援串接 Google Calendar API。
-  - **Google 日曆色彩標籤 (Event Color ID) 對應規則**（以 `services/event_mapping.py` 的 `COLOR_PRIORITY_MAP` 為準）：
+  - **等級判斷順序**：以 `extendedProperties.private.secretary_priority`（major/medium/minor）為主；缺少或不合法時退回 colorId。網頁/手機手動改顏色不會改變已存的等級；舊事件不主動補寫，從程式修改等級時才寫入（同時寫 colorId 與 extendedProperties）。
+  - **Google 日曆色彩標籤 (Event Color ID) 備援對應規則**（以 `services/event_mapping.py` 的 `COLOR_PRIORITY_MAP` 為準）：
     - **Color ID 11 (Tomato)、4 (Flamingo)** ➔ **大事件 (提前 30 天/1個月顯示於右側提醒欄)**
     - **Color ID 5 (Banana)、6 (Tangerine)** ➔ **中事件 (提前 7 天/1週顯示於右側提醒欄)**
     - **Color ID 2 (Sage)、10 (Basil)** ➔ **小事件 (提前 3 天顯示於右側提醒欄)**
