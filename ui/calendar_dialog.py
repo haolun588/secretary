@@ -8,7 +8,8 @@ from utils.paths import asset_path, qss_url
 from PyQt6.QtCore import Qt, QDate, QTime, QDateTime
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QComboBox, QTextEdit, QCalendarWidget, QWidget
+    QPushButton, QComboBox, QTextEdit, QCalendarWidget, QWidget,
+    QCheckBox, QMessageBox
 )
 from PyQt6.QtGui import QIcon, QFont, QColor, QTextCharFormat
 
@@ -99,6 +100,7 @@ class ConfirmDeleteDialog(QDialog):
 
         # 訊息內容
         msg_lbl = QLabel(f"確定要刪除「{self.title_name}」嗎？", self)
+        msg_lbl.setTextFormat(Qt.TextFormat.PlainText)
         msg_lbl.setObjectName("ConfirmMsg")
         msg_lbl.setStyleSheet("background: transparent; border: none;")
         layout.addWidget(msg_lbl)
@@ -275,11 +277,13 @@ class DatePopupButton(QPushButton):
 
 
 class CalendarDialog(QDialog):
-    def __init__(self, parent=None, event_data=None):
+    def __init__(self, parent=None, event_data=None, default_date=None):
         super().__init__(parent)
         self.event_data = event_data or {}
+        self.default_date = default_date if default_date is not None else QDate.currentDate()
         self.is_delete = False
         self.init_ui()
+        self.load_event_data()
 
     def init_ui(self):
         self.setWindowTitle("新增 / 編輯行程")
@@ -403,11 +407,15 @@ class CalendarDialog(QDialog):
         self.priority_combo.setCurrentIndex(prio_map.get(current_prio, 1))
         layout.addWidget(self.priority_combo)
 
+        self.all_day_chk = QCheckBox("全天", self)
+        self.all_day_chk.toggled.connect(self.on_all_day_toggled)
+        layout.addWidget(self.all_day_chk)
+
         layout.addWidget(QLabel("開始時間"))
         start_row = QHBoxLayout()
         start_row.setSpacing(10)
 
-        self.start_date_btn = DatePopupButton(QDate.currentDate(), self)
+        self.start_date_btn = DatePopupButton(self.default_date, self)
         self.start_date_btn.setObjectName("DateBtn")
 
         self.start_time = QComboBox(self)
@@ -424,7 +432,7 @@ class CalendarDialog(QDialog):
         end_row = QHBoxLayout()
         end_row.setSpacing(10)
 
-        self.end_date_btn = DatePopupButton(QDate.currentDate(), self)
+        self.end_date_btn = DatePopupButton(self.default_date, self)
         self.end_date_btn.setObjectName("DateBtn")
 
         self.end_time = QComboBox(self)
@@ -446,7 +454,7 @@ class CalendarDialog(QDialog):
         layout.addWidget(QLabel("備註資訊"))
         self.notes_input = QTextEdit(self)
         self.notes_input.setPlaceholderText("請輸入行程詳細說明...")
-        self.notes_input.setText(self.event_data.get("notes", ""))
+        self.notes_input.setPlainText(self.event_data.get("notes", ""))
         layout.addWidget(self.notes_input)
 
         layout.addStretch(1)
@@ -478,6 +486,72 @@ class CalendarDialog(QDialog):
 
         layout.addLayout(btn_layout)
 
+    def on_all_day_toggled(self, checked):
+        self.start_time.setVisible(not checked)
+        self.end_time.setVisible(not checked)
+        self.start_time.setEnabled(not checked)
+        self.end_time.setEnabled(not checked)
+
+    @staticmethod
+    def _select_time(combo, hhmm):
+        """選取時間；不在 30 分清單中則插入該選項（依時間排序位置）"""
+        index = combo.findText(hhmm)
+        if index < 0:
+            pos = combo.count()
+            for i in range(combo.count()):
+                if combo.itemText(i) > hhmm:
+                    pos = i
+                    break
+            combo.insertItem(pos, hhmm)
+            index = pos
+        combo.setCurrentIndex(index)
+
+    def load_event_data(self):
+        """編輯模式：把既有行程帶入各欄位（新增模式維持預設）"""
+        ev = self.event_data
+        if not ev:
+            return
+        start = str(ev.get("start", ""))
+        end = str(ev.get("end") or start)
+        all_day = bool(ev["all_day"]) if "all_day" in ev else ("T" not in start)
+
+        s_date = QDate.fromString(start[:10], "yyyy-MM-dd")
+        e_date = QDate.fromString(end[:10], "yyyy-MM-dd")
+        if s_date.isValid():
+            self.start_date_btn.setDate(s_date)
+        if e_date.isValid():
+            self.end_date_btn.setDate(e_date)
+        elif s_date.isValid():
+            self.end_date_btn.setDate(s_date)
+
+        if not all_day:
+            if len(start) >= 16:
+                self._select_time(self.start_time, start[11:16])
+            if len(end) >= 16:
+                self._select_time(self.end_time, end[11:16])
+        self.all_day_chk.setChecked(all_day)
+
+    def _validation_error(self):
+        """回傳錯誤訊息；通過驗證回傳 None（end < start 視為錯誤）"""
+        start_d = self.start_date_btn.date()
+        end_d = self.end_date_btn.date()
+        if self.all_day_chk.isChecked():
+            if end_d < start_d:
+                return "結束日期不能早於開始日期"
+            return None
+        start_key = (start_d.toString("yyyy-MM-dd"), self.start_time.currentText())
+        end_key = (end_d.toString("yyyy-MM-dd"), self.end_time.currentText())
+        if end_key < start_key:
+            return "結束時間不能早於開始時間"
+        return None
+
+    def accept(self):
+        error = self._validation_error()
+        if error:
+            QMessageBox.warning(self, "時間設定有誤", error)
+            return
+        super().accept()
+
     def on_delete_clicked(self):
         title_name = self.title_input.text().strip() or "此行程"
         confirm_dlg = ConfirmDeleteDialog(title_name, parent=self)
@@ -487,15 +561,24 @@ class CalendarDialog(QDialog):
 
     def get_data(self):
         s_date_str = self.start_date_btn.date().toString("yyyy-MM-dd")
-        s_time_str = self.start_time.currentText()
         e_date_str = self.end_date_btn.date().toString("yyyy-MM-dd")
-        e_time_str = self.end_time.currentText()
+        all_day = self.all_day_chk.isChecked()
+        if all_day:
+            start, end = s_date_str, e_date_str
+        else:
+            start = f"{s_date_str}T{self.start_time.currentText()}:00"
+            end = f"{e_date_str}T{self.end_time.currentText()}:00"
+
+        title = self.title_input.text().strip()
+        if not title:
+            title = self.event_data.get("title") or "新行程"
 
         return {
-            "title": self.title_input.text().strip(),
+            "title": title,
             "priority": self.priority_combo.currentData(),
-            "start": f"{s_date_str}T{s_time_str}:00",
-            "end": f"{e_date_str}T{e_time_str}:00",
+            "all_day": all_day,
+            "start": start,
+            "end": end,
             "location": self.location_input.text().strip(),
             "notes": self.notes_input.toPlainText().strip()
         }

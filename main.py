@@ -8,7 +8,7 @@ Secretary 智能桌面小助理 - 主程式入口 (Application Entry Point)
 import sys
 import os
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
+from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox
 from PyQt6.QtGui import QIcon, QAction, QPixmap, QColor, QPainter
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
@@ -24,6 +24,7 @@ except Exception as _e:
 
 from utils.config_manager import ConfigManager
 from utils.autostart import AutoStartManager
+from services.event_store import EventStore
 from ui.main_window import MainWindow
 from ui.toast_window import ToastWindow
 
@@ -73,7 +74,14 @@ class SecretaryApp:
         # 維護作用中的 Toast 物件引用清單，防記憶體垃圾回收崩潰
         self.active_toasts = []
 
-        self.window = MainWindow(config_manager=ConfigManager)
+        # 行程資料唯一來源；以 app 為 parent，並注入各 view
+        self.event_store = EventStore(parent=self.app)
+        self._last_fetch_error = None
+        self.event_store.operation_failed.connect(self.on_store_failed)
+        self.event_store.operation_succeeded.connect(self.on_store_succeeded)
+        self.event_store.sync_state_changed.connect(self.on_store_sync_state)
+
+        self.window = MainWindow(config_manager=ConfigManager, event_store=self.event_store)
 
         # 設定頁面初始化狀態
         self.window.settings_view.chk_water_enabled.setChecked(self.water_enabled)
@@ -193,6 +201,36 @@ class SecretaryApp:
         except Exception as e:
             logger.exception("觸發提醒彈窗異常")
 
+    def on_store_failed(self, action, message):
+        """行程同步／寫入失敗統一提示。fetch/check 失敗同一訊息連續只提示一次。"""
+        if action in ("fetch", "check"):
+            if message == self._last_fetch_error:
+                return
+            self._last_fetch_error = message
+        try:
+            toast = ToastWindow(
+                title="同步失敗 ⚠️",
+                message=message,
+                display_time_ms=4000,
+                fade_time_ms=800
+            )
+            self.active_toasts.append(toast)
+            toast.destroyed.connect(lambda obj, t=toast: self.cleanup_toast(t))
+            toast.show()
+        except Exception:
+            logger.exception("顯示同步失敗提示異常")
+
+        if action in ("add", "update", "delete", "auth") and self.window.isVisible():
+            QMessageBox.warning(self.window, "Google 日曆操作失敗", message)
+
+    def on_store_succeeded(self, action):
+        if action in ("fetch", "check"):
+            self._last_fetch_error = None
+
+    def on_store_sync_state(self, state, message):
+        if state == "ok":
+            self._last_fetch_error = None
+
     def cleanup_toast(self, toast_instance):
         if toast_instance in self.active_toasts:
             self.active_toasts.remove(toast_instance)
@@ -236,6 +274,7 @@ class SecretaryApp:
     def quit_app(self):
         logger.info("正在退出 Secretary 小助理...")
         self.second_timer.stop()
+        self.event_store.shutdown()
         QLocalServer.removeServer(SINGLE_INSTANCE_SOCKET)
         self.tray_icon.hide()
         self.app.quit()
@@ -246,6 +285,9 @@ class SecretaryApp:
         else:
             logger.info("開機靜默啟動模式：隱藏於背景系統托盤")
         
+        # 背景靜默載入 token，成功則拉取行程
+        self.event_store.start()
+
         return self.app.exec()
 
 def is_already_running():

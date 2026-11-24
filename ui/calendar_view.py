@@ -3,39 +3,45 @@ ui/calendar_view.py
 日曆與近期提醒儀表板 (Calendar Dashboard View) - 包含 100% 依字數自適應高度與標題/地點/備註獨立三行卡片
 """
 
-from datetime import datetime
+import html
 from PyQt6.QtCore import Qt, QDate, QTimer
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QCalendarWidget, QLabel,
-    QPushButton, QScrollArea, QFrame, QSizePolicy, QHeaderView, QTableView
+    QPushButton, QScrollArea, QFrame, QSizePolicy, QHeaderView, QTableView, QMessageBox
 )
 from PyQt6.QtGui import QFont, QColor, QPalette, QTextCharFormat
 
 from ui.calendar_dialog import CalendarDialog
 from utils.logger import get_logger
 from utils.paths import asset_path, qss_url
-from utils.google_calendar import GoogleCalendarService, GoogleFetchWorker
 
 logger = get_logger(__name__)
 
 class CalendarView(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, event_store, parent=None):
         super().__init__(parent)
 
-        self.google_service = GoogleCalendarService()
-        self.mock_events = []
-        self.fetch_worker = None
+        self.event_store = event_store
+        # store 推來的事件複本；QDate 另存於 _qdate_start/_qdate_end，不寫回 store 的 dict
+        self._events = []
 
         self.init_ui()
         self.customize_calendar_internals()
+
+        self.event_store.events_changed.connect(self.on_events_changed)
+        self.event_store.sync_state_changed.connect(self.on_sync_state_changed)
+        self.calendar.currentPageChanged.connect(
+            lambda y, m: self.event_store.ensure_month(y, m)
+        )
 
         # 每 60 秒背景非同步靜默刷新 Google 日曆
         self.sync_timer = QTimer(self)
         self.sync_timer.timeout.connect(self.sync_google_events)
         self.sync_timer.start(60000)
 
-        # 啟動時非同步載入 Google 日曆 (不阻塞 UI)
-        QTimer.singleShot(100, self.sync_google_events)
+        # 設定目前顯示月份的拉取範圍（未授權時只記錄範圍，不送網路）
+        today = QDate.currentDate()
+        self.event_store.ensure_month(today.year(), today.month())
 
     def init_ui(self):
         self.setStyleSheet("""
@@ -374,7 +380,7 @@ class CalendarView(QWidget):
         self.sync_btn.setObjectName("SyncGoogleBtn")
         self.sync_btn.setToolTip("手動非同步同步 Google 日曆最新行程")
         self.sync_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sync_btn.clicked.connect(self.sync_google_events)
+        self.sync_btn.clicked.connect(self.on_sync_clicked)
         top_nav_row2.addWidget(self.sync_btn)
 
         top_nav_row2.addStretch(1)
@@ -468,18 +474,69 @@ class CalendarView(QWidget):
             logger.warning(f"樣式覆蓋: {e}")
 
     def sync_google_events(self):
-        if self.fetch_worker and self.fetch_worker.isRunning():
+        """60 秒計時器用：未授權時靜默略過"""
+        if self.event_store.is_authenticated:
+            self.event_store.refresh()
+
+    def on_sync_clicked(self):
+        """手動按鈕：未授權時給回饋，已授權則重新拉取"""
+        if self.event_store.is_authenticated:
+            self.event_store.refresh()
             return
+        message = "尚未連線 Google 日曆，請到設定頁授權"
+        self.sync_btn.setToolTip(message)
+        QMessageBox.information(self, "尚未連線", message)
 
-        self.sync_btn.setText("🔄 同步中...")
-        self.fetch_worker = GoogleFetchWorker(self.google_service)
-        self.fetch_worker.fetched_signal.connect(self.on_async_events_fetched)
-        self.fetch_worker.start()
+    def on_sync_state_changed(self, state, message):
+        if state == "syncing":
+            self.sync_btn.setText("🔄 同步中...")
+            self.sync_btn.setToolTip("同步中")
+        elif state in ("error", "offline"):
+            self.sync_btn.setText("⚠️ 同步失敗")
+            self.sync_btn.setToolTip(message)
+        else:
+            self.sync_btn.setText("🔄 雲端同步")
+            self.sync_btn.setToolTip("手動非同步同步 Google 日曆最新行程")
 
-    def on_async_events_fetched(self, events):
-        self.sync_btn.setText("🔄 雲端同步")
-        if events:
-            self.on_google_events_synced(events)
+    def on_events_changed(self, events):
+        """store 推送完整事件清單（含空清單，需清空並重繪）"""
+        self._events = []
+        for ev in events:
+            try:
+                item = dict(ev)
+                start_d = QDate.fromString(str(item["start"])[:10], "yyyy-MM-dd")
+                end_d = QDate.fromString(str(item.get("end") or item["start"])[:10], "yyyy-MM-dd")
+                if not start_d.isValid():
+                    continue
+                if not end_d.isValid() or end_d < start_d:
+                    end_d = start_d
+                elif (
+                    not item.get("all_day")
+                    and str(item.get("end", ""))[11:19] == "00:00:00"
+                    and end_d > start_d
+                ):
+                    # 定時行程剛好結束於隔天 00:00 → 實際只到前一天，不佔隔天
+                    end_d = end_d.addDays(-1)
+                item["_qdate_start"] = start_d
+                item["_qdate_end"] = end_d
+                self._events.append(item)
+            except Exception:
+                logger.exception("解析行程時間失敗")
+        self.refresh_upcoming_sidebar()
+        self.on_date_selected()
+
+    @staticmethod
+    def _time_text(evt):
+        """卡片時間顯示：全天顯示「全天」，定時顯示 HH:MM - HH:MM（naive 本機時間字串）"""
+        if evt.get("all_day"):
+            return "全天"
+        start = str(evt.get("start", ""))
+        end = str(evt.get("end", ""))
+        start_t = start[11:16] if len(start) >= 16 else ""
+        end_t = end[11:16] if len(end) >= 16 else ""
+        if start_t and end_t:
+            return f"{start_t} - {end_t}"
+        return start_t or end_t
 
     def refresh_upcoming_sidebar(self):
         while self.sidebar_content_layout.count():
@@ -490,12 +547,11 @@ class CalendarView(QWidget):
         today = QDate.currentDate()
         upcoming_items = []
 
-        for evt in self.mock_events:
-            evt_date = evt["date"]
-            days_diff = today.daysTo(evt_date)
-
-            if days_diff < 0:
+        for evt in self._events:
+            # 已結束的行程不顯示；進行中的（跨日）視為今天
+            if evt["_qdate_end"] < today:
                 continue
+            days_diff = max(0, today.daysTo(evt["_qdate_start"]))
 
             prio = evt.get("priority", "minor")
             show = False
@@ -594,18 +650,21 @@ class CalendarView(QWidget):
         layout.addLayout(top_h)
 
         title_lbl = QLabel(evt["title"], card)
+        title_lbl.setTextFormat(Qt.TextFormat.PlainText)
         title_lbl.setWordWrap(True)
         title_lbl.setStyleSheet("color: #ffffff; font-weight: 700; font-size: 13px; border: none; background: transparent;")
         layout.addWidget(title_lbl)
 
-        date_str = evt["date"].toString("yyyy/MM/dd (ddd)")
-        date_lbl = QLabel(f"📅 {date_str}", card)
+        date_str = evt["_qdate_start"].toString("yyyy/MM/dd (ddd)")
+        date_lbl = QLabel(f"📅 {date_str}  {self._time_text(evt)}", card)
+        date_lbl.setTextFormat(Qt.TextFormat.PlainText)
         date_lbl.setWordWrap(True)
         date_lbl.setStyleSheet("color: #a0a0ab; font-size: 10.5px; border: none; background: transparent;")
         layout.addWidget(date_lbl)
 
         if evt.get("location"):
             loc_lbl = QLabel(f"📍 {evt['location']}", card)
+            loc_lbl.setTextFormat(Qt.TextFormat.PlainText)
             loc_lbl.setWordWrap(True)
             loc_lbl.setStyleSheet("color: #71717a; font-size: 10.5px; border: none; background: transparent;")
             layout.addWidget(loc_lbl)
@@ -640,8 +699,13 @@ class CalendarView(QWidget):
         layout.setContentsMargins(10, 6, 10, 6)
         layout.setSpacing(2)
 
+        time_lbl = QLabel(f"🕒 {self._time_text(evt)}", card)
+        time_lbl.setTextFormat(Qt.TextFormat.PlainText)
+        time_lbl.setStyleSheet("color: #8b5cf6; font-size: 11.5px; font-weight: 600; border: none; background: transparent; margin: 0; padding: 0;")
+        layout.addWidget(time_lbl)
+
         # 第一行：行程標題 (獨立一行，長字串自動折行)
-        title_html = f'<div style="word-break: break-all; color: #ffffff; font-weight: 700; font-size: 13px; line-height: 1.3;">📌  {evt.get("title", "無標題")}</div>'
+        title_html = f'<div style="word-break: break-all; color: #ffffff; font-weight: 700; font-size: 13px; line-height: 1.3;">📌  {html.escape(evt.get("title", "無標題"))}</div>'
         title_lbl = QLabel(title_html, card)
         title_lbl.setWordWrap(True)
         title_lbl.setStyleSheet("border: none; background: transparent; margin: 0; padding: 0;")
@@ -649,7 +713,7 @@ class CalendarView(QWidget):
 
         # 第二行：地點 (若有填寫，獨立一行，不與標題搶位置)
         if evt.get("location"):
-            loc_html = f'<div style="word-break: break-all; color: #a0a0ab; font-size: 11.5px; line-height: 1.3;">📍  {evt["location"]}</div>'
+            loc_html = f'<div style="word-break: break-all; color: #a0a0ab; font-size: 11.5px; line-height: 1.3;">📍  {html.escape(evt["location"])}</div>'
             loc_lbl = QLabel(loc_html, card)
             loc_lbl.setWordWrap(True)
             loc_lbl.setStyleSheet("border: none; background: transparent; margin: 0; padding: 0;")
@@ -657,7 +721,7 @@ class CalendarView(QWidget):
 
         # 第三行：備註資訊 (若有填寫，獨立一行，長字串自動折行)
         if evt.get("notes"):
-            notes_html = f'<div style="word-break: break-all; color: #8b8b9e; font-size: 11.5px; line-height: 1.3;">📝  {evt["notes"]}</div>'
+            notes_html = f'<div style="word-break: break-all; color: #8b8b9e; font-size: 11.5px; line-height: 1.3;">📝  {html.escape(evt["notes"])}</div>'
             notes_lbl = QLabel(notes_html, card)
             notes_lbl.setWordWrap(True)
             notes_lbl.setStyleSheet("border: none; background: transparent; margin: 0; padding: 0;")
@@ -677,7 +741,7 @@ class CalendarView(QWidget):
             if item.widget():
                 item.widget().deleteLater()
 
-        date_events = [e for e in self.mock_events if e["date"] == sel_date]
+        date_events = [e for e in self._events if e["_qdate_start"] <= sel_date <= e["_qdate_end"]]
 
         if not date_events:
             empty_lbl = QLabel("本日尚未安排任何行程，點擊上方按鈕新增 ➕", self)
@@ -691,61 +755,18 @@ class CalendarView(QWidget):
             self.date_events_layout.addStretch(1)
 
     def on_add_event_clicked(self):
-        dlg = CalendarDialog(self)
+        dlg = CalendarDialog(self, default_date=self.calendar.selectedDate())
         if dlg.exec() == CalendarDialog.DialogCode.Accepted:
-            data = dlg.get_data()
-            new_evt = {
-                "id": str(len(self.mock_events) + 1),
-                "title": data["title"] or "新行程",
-                "date": QDate.fromString(data["start"][:10], "yyyy-MM-dd"),
-                "start": data["start"],
-                "end": data["end"],
-                "priority": data["priority"],
-                "location": data["location"],
-                "notes": data["notes"]
-            }
-            self.google_service.add_event(new_evt)
-
-            self.mock_events.append(new_evt)
-            self.refresh_upcoming_sidebar()
-            self.on_date_selected()
-
-    def on_google_events_synced(self, google_events):
-        if google_events:
-            self.mock_events = []
-            for g_evt in google_events:
-                try:
-                    start_str = g_evt["start"][:10]
-                    g_date = QDate.fromString(start_str, "yyyy-MM-dd")
-                    g_evt["date"] = g_date
-                    self.mock_events.append(g_evt)
-                except Exception as e:
-                    logger.exception("解析 Google 行程時間失敗")
-
-            self.refresh_upcoming_sidebar()
-            self.on_date_selected()
+            # 不在本地 append，等 store 寫入成功後以 events_changed 更新
+            self.event_store.add_event(dlg.get_data())
 
     def on_edit_event(self, evt):
         dlg = CalendarDialog(self, event_data=evt)
         res = dlg.exec()
+        evt_id = evt.get("id")
         if dlg.is_delete or res == 2:
-            evt_id = evt.get("id")
             if evt_id:
-                self.google_service.delete_event(evt_id)
-            if evt in self.mock_events:
-                self.mock_events.remove(evt)
-            self.refresh_upcoming_sidebar()
-            self.on_date_selected()
+                self.event_store.delete_event(evt_id)
         elif res == CalendarDialog.DialogCode.Accepted:
-            data = dlg.get_data()
-            evt["title"] = data["title"] or evt["title"]
-            evt["priority"] = data["priority"]
-            evt["location"] = data["location"]
-            evt["notes"] = data["notes"]
-            
-            # 同步更新至 Google Calendar 雲端
-            if evt.get("id"):
-                self.google_service.update_event(evt)
-
-            self.refresh_upcoming_sidebar()
-            self.on_date_selected()
+            if evt_id:
+                self.event_store.update_event(evt_id, dlg.get_data())

@@ -10,16 +10,14 @@ from PyQt6.QtWidgets import (
     QPushButton, QCheckBox, QFrame, QGroupBox, QMessageBox, QScrollArea
 )
 from ui.toast_window import ToastWindow
-from utils.google_calendar import GoogleCalendarService
 
 class SettingsView(QWidget):
-    google_connected_signal = pyqtSignal(list)
     water_enabled_signal = pyqtSignal(bool)
     autostart_signal = pyqtSignal(bool)
 
-    def __init__(self, parent=None):
+    def __init__(self, event_store, parent=None):
         super().__init__(parent)
-        self.google_service = GoogleCalendarService()
+        self.event_store = event_store
         self.init_ui()
 
     def init_ui(self):
@@ -161,7 +159,7 @@ class SettingsView(QWidget):
         w_layout.addWidget(desc_lbl)
 
         test_row = QHBoxLayout()
-        test_btn = QPushButton("🔔 庫即測試右下角提醒彈窗 (3秒淡出)", water_group)
+        test_btn = QPushButton("🔔 立即測試右下角提醒彈窗 (3秒淡出)", water_group)
         test_btn.setObjectName("TestBtn")
         test_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         test_btn.clicked.connect(self.on_test_toast)
@@ -199,12 +197,12 @@ class SettingsView(QWidget):
         g_layout.setSpacing(18)
 
         g_status_row = QHBoxLayout()
-        self.g_status_lbl = QLabel("狀態：🔴 尚未授權 (點擊右側按鈕開啟 Google OAuth2 授權)", google_group)
+        self.g_status_lbl = QLabel("狀態：⏳ 檢查連線中...", google_group)
         self.g_status_lbl.setStyleSheet("font-size: 13px;")
         g_status_row.addWidget(self.g_status_lbl)
         g_status_row.addStretch(1)
 
-        connect_btn = QPushButton("🔑 登入 Google 帳號串接", google_group)
+        self.connect_btn = connect_btn = QPushButton("🔑 登入 Google 帳號串接", google_group)
         connect_btn.setObjectName("ConnectGoogleBtn")
         connect_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         connect_btn.clicked.connect(self.on_google_connect)
@@ -226,13 +224,60 @@ class SettingsView(QWidget):
         main_vbox.setContentsMargins(0, 0, 0, 0)
         main_vbox.addWidget(scroll_area)
 
-        # 實質測試 Google Calendar API 雲端連線狀態
-        if self.google_service.check_connection():
-            self.g_status_lbl.setText("狀態：🟢 已成功連線 Google 日曆 (雲端同步運作中)")
-            self.g_status_lbl.setStyleSheet("color: #10b981; font-weight: bold;")
+        self.event_store.auth_state_changed.connect(self.on_auth_state_changed)
+        self.event_store.sync_state_changed.connect(self.on_sync_state_changed)
+        self.event_store.operation_failed.connect(self.on_operation_failed)
+        self.event_store.operation_succeeded.connect(self.on_operation_succeeded)
+        # 狀態由 main.py 呼叫 event_store.start() 後的 auth_state_changed 驅動
+
+    def _set_status(self, text, color=None):
+        self.g_status_lbl.setText(text)
+        if color:
+            self.g_status_lbl.setStyleSheet(f"color: {color}; font-weight: bold;")
         else:
-            self.g_status_lbl.setText("狀態：🔴 尚未授權 (點擊右側按鈕開啟 Google OAuth2 授權)")
-            self.g_status_lbl.setStyleSheet("color: #f43f5e; font-weight: bold;")
+            self.g_status_lbl.setStyleSheet("font-size: 13px;")
+
+    def _show_unauthorized(self):
+        self._set_status("狀態：🔴 尚未授權 (點擊右側按鈕開啟 Google OAuth2 授權)", "#f43f5e")
+
+    def on_auth_state_changed(self, authenticated):
+        if self.event_store.is_authorizing:
+            return  # 授權進行中維持「等待瀏覽器授權」
+        if authenticated:
+            self._set_status("狀態：🟢 已成功連線 Google 日曆 (雲端同步運作中)", "#10b981")
+            self.connect_btn.setEnabled(True)
+        else:
+            self._show_unauthorized()
+            if not self.event_store.is_authorizing:
+                self.connect_btn.setEnabled(True)
+
+    def on_operation_succeeded(self, action):
+        if action == "auth":
+            QMessageBox.information(
+                self,
+                "Google 授權成功",
+                "🎉 已成功連線至您的 Google 日曆！\n已同步雲端行程，並自動依色彩標籤 (紅:大30天 / 黃:中7天 / 綠藍:小3天) 進行分類提醒。"
+            )
+
+    def on_sync_state_changed(self, state, message):
+        if state == "authorizing":
+            self._set_status("狀態：⏳ 等待瀏覽器授權（最多 3 分鐘）...", "#f59e0b")
+            self.connect_btn.setEnabled(False)
+        elif self.event_store.is_authorizing:
+            return  # 授權進行中不覆寫「等待瀏覽器授權」狀態文字
+        elif state == "offline":
+            self._set_status("狀態：🟠 無法連線（離線或逾時）", "#f59e0b")
+        elif state == "ok" and self.event_store.is_authenticated:
+            self._set_status("狀態：🟢 已成功連線 Google 日曆 (雲端同步運作中)", "#10b981")
+
+    def on_operation_failed(self, action, message):
+        """授權失敗的提示由 main.py 統一處理；這裡只恢復按鈕與狀態文字。"""
+        if action == "auth":
+            self.connect_btn.setEnabled(True)
+            if self.event_store.is_authenticated:
+                self._set_status("狀態：🟢 已成功連線 Google 日曆 (雲端同步運作中)", "#10b981")
+            else:
+                self._show_unauthorized()
 
     def on_water_enabled_toggled(self, checked):
         self.spin_interval.setEnabled(checked)
@@ -252,22 +297,4 @@ class SettingsView(QWidget):
         self.test_toast.show()
 
     def on_google_connect(self):
-        success = self.google_service.authenticate(force_interactive=True)
-        if success:
-            self.g_status_lbl.setText("狀態：🟢 已成功連線 Google 日曆 (雲端同步運作中)")
-            self.g_status_lbl.setStyleSheet("color: #10b981; font-weight: bold;")
-            events = self.google_service.fetch_upcoming_events()
-            self.google_connected_signal.emit(events)
-            QMessageBox.information(
-                self,
-                "Google 授權成功",
-                "🎉 已成功連線至您的 Google 日曆！\n已同步雲端行程，並自動依色彩標籤 (紅:大30天 / 黃:中7天 / 綠藍:小3天) 進行分類提醒。"
-            )
-        else:
-            self.g_status_lbl.setText("狀態：🔴 尚未授權 (點擊右側按鈕開啟 Google OAuth2 授權)")
-            self.g_status_lbl.setStyleSheet("color: #f43f5e; font-weight: bold;")
-            QMessageBox.warning(
-                self,
-                "Google 授權提示",
-                "尚未偵測到 credentials.json 憑證檔或網頁授權未完成。\n\n如需正式同步您的私人 Google 日曆：\n1. 請確認憑證檔命名為 credentials.json 並放置於專案的 data 資料夾內（data/credentials.json）。\n2. 點擊按鈕授權時，請於彈出的瀏覽器視窗完成允許授權。"
-            )
+        self.event_store.authorize()

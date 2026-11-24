@@ -15,8 +15,9 @@ from ui.calendar_view import CalendarView
 from ui.settings_view import SettingsView
 
 class MainWindow(QMainWindow):
-    def __init__(self, config_manager=None, parent=None):
+    def __init__(self, config_manager=None, event_store=None, parent=None):
         super().__init__(parent)
+        self.event_store = event_store
         self.config_manager = config_manager
         self.config = self.config_manager.load_config() if self.config_manager else {}
         self.init_ui()
@@ -49,14 +50,11 @@ class MainWindow(QMainWindow):
         self.stacked_widget = QStackedWidget(self)
         self.stacked_widget.setStyleSheet("background-color: #121217;")
 
-        self.calendar_view = CalendarView(self)
-        self.settings_view = SettingsView(self)
+        self.calendar_view = CalendarView(self.event_store, self)
+        self.settings_view = SettingsView(self.event_store, self)
 
         self.stacked_widget.addWidget(self.calendar_view) # Index 0: 日曆儀表板
         self.stacked_widget.addWidget(self.settings_view) # Index 1: 系統與喝水設定
-
-        # 串接 Google 授權連線成功訊號至日曆視窗
-        self.settings_view.google_connected_signal.connect(self.calendar_view.on_google_events_synced)
 
         main_layout.addWidget(self.stacked_widget, stretch=1)
 
