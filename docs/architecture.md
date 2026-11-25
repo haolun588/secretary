@@ -4,13 +4,13 @@
 ```
 secretary/
 ├── CLAUDE.md                     # AI 協作規範與作業紅線
-├── requirements.txt              # 直接依賴（固定版本）
+├── requirements.txt              # 直接依賴（固定版本；含 PyQt6-WebEngine 供 MLB 頁使用）
 ├── requirements-dev.txt          # 開發依賴（pytest，固定版本）
 ├── .gitignore
 ├── assets/                       # 圖示資源
 │   ├── logo.svg                  # 品牌 logo 原稿（青綠漸層圓角方塊＋日曆＋時鐘，原色渲染，不重新上色）；側邊欄、get_app_icon 後備、icon.png / icon.ico 皆由它而來
 │   ├── icon.ico / icon.png       # 應用程式圖示（由 icon_generator 自 logo.svg 產生；ico 內含 16/24/32/48/64/128/256 七種尺寸）
-│   └── icons/*.svg               # UI 線條圖示（專案自繪，24 格、stroke currentColor；風格參考 Lucide（ISC 授權），非複製 Lucide 原始檔）
+│   └── icons/*.svg               # UI 線條圖示（專案自繪，24 格、stroke currentColor；風格參考 Lucide（ISC 授權），非複製 Lucide 原始檔）；含 baseball.svg（MLB 導覽圖示）
 ├── docs/
 │   ├── dev_rules.md              # 技術規範與設計指南（含 UI 規範、視覺預覽）
 │   ├── progress.md               # 任務進度清單與已知問題
@@ -37,8 +37,8 @@ secretary/
 │   ├── styles.py                 # 全域 QSS（依元件分段：按鈕、輸入、開關、選單、捲軸、導覽、工具列、面板、對話框、設定、toast…）、build_palette、apply_app_style、qcolor、make_font、fit_text、repolish
 │   ├── icons.py                  # SVG 圖示載入與上色：icon()/pixmap()，處理高 DPI；QSS 用的上色圖示匯出
 │   ├── components.py             # 共用元件：IconButton、SegmentedControl、SyncStatusBadge、LevelDot、level_color、level_bg、level_text、sync_state_presentation
-│   ├── nav_sidebar.py            # 52px 圖示導覽列：Logo／日曆／喝水／設定（checkable 互斥）＋底部喝水倒數（set_countdown、format_countdown）
-│   ├── main_window.py            # 主視窗外框：NavSidebar + QStackedWidget(CalendarView, SettingsView)，首次顯示啟用深色標題列，closeEvent 縮到托盤
+│   ├── nav_sidebar.py            # 52px 圖示導覽列：Logo／日曆／喝水／MLB／設定（checkable 互斥）＋底部喝水倒數（set_countdown、format_countdown）
+│   ├── main_window.py            # 主視窗外框：NavSidebar + QStackedWidget(CalendarView, WaterView, MlbView, SettingsView)，首次顯示啟用深色標題列，closeEvent 縮到托盤
 │   ├── calendar_view.py          # 日曆頁：工具列（標題、‹ ›、今天、月/週/日、同步徽章、新增）+ 視圖區 + 右側面板；串接 EventStore
 │   ├── calendar_logic.py         # 日曆純邏輯（不 import Qt widgets）：月格日期、週日期、行程日期解析、即將到來規則、還有 N 天、時間軸重疊分欄
 │   ├── month_grid.py             # 月視圖（QPainter 自繪）
@@ -48,6 +48,7 @@ secretary/
 │   ├── confirm_dialog.py         # 共用確認對話框 ConfirmDialog（刪除、登出）
 │   ├── settings_view.py          # 設定頁：段落式清單（一般、Google 日曆）；喝水提醒已移至 water_view.py
 │   ├── water_view.py             # 喝水提醒頁：大字倒數（set_countdown，None 顯示「已停用」）＋啟用開關、提醒間隔、測試按鈕
+│   ├── mlb_view.py               # MLB 每日頁：頂部標題＋「重新整理」，QWebEngineView 內嵌 MLB_DAILY_URL（首次顯示才建立並載入）；載入失敗顯示提示 QLabel；新視窗請求交給系統瀏覽器
 │   ├── toast_window.py           # ToastWindow（info/water/danger、按鈕、關閉鈕、hover 暫停）與 ToastStack（多則堆疊與重排）
 │   └── tray_menu.py              # 托盤右鍵選單建構（圖示、無 emoji）
 └── utils/
@@ -74,7 +75,8 @@ secretary/
 - 深色標題列：`utils/win_titlebar.py` 只呼叫 DWM 視窗屬性（不碰 Registry），主視窗與對話框 showEvent 時啟用。
 
 ### 2.2 日曆頁結構與設計取捨
-- **導覽**：`NavSidebar` 為 52px 圖示列。頁面順序為 日曆(0)／喝水(1)／設定(2)，與側欄按鈕順序一致（`PAGE_CALENDAR`／`PAGE_WATER`／`PAGE_SETTINGS`），三顆按鈕都走 `set_active_page`。喝水為獨立頁面（`WaterView`）：頂部大字倒數，下方沿用設定頁的卡片列放開關、間隔、測試；`main.py` 每秒同時餵導覽列與喝水頁。
+- **導覽**：`NavSidebar` 為 52px 圖示列。頁面順序為 日曆(0)／喝水(1)／MLB(2)／設定(3)，與側欄按鈕順序一致（`PAGE_CALENDAR`／`PAGE_WATER`／`PAGE_MLB`／`PAGE_SETTINGS`），四顆按鈕都走 `set_active_page`。喝水為獨立頁面（`WaterView`）：頂部大字倒數，下方沿用設定頁的卡片列放開關、間隔、測試；`main.py` 每秒同時餵導覽列與喝水頁。
+- **MLB 內嵌頁**：`MlbView` 以 `QWebEngineView` 內嵌 `https://haolun588.github.io/MLB-daily/index.html`（常數 `MLB_DAILY_URL`）。第一次顯示該頁才建立 view 並載入（延遲載入，不拖慢啟動）；`loadFinished(False)` 時顯示「無法載入 MLB 頁面，請檢查網路後按重新整理」；網頁開新視窗（`newWindowRequested`）改由 `QDesktopServices` 用系統瀏覽器開啟。QtWebEngine 要求在建立 `QApplication` 前先 `import PyQt6.QtWebEngineWidgets`，故 `main.py` 與 `tests/conftest.py` 都有此 import。
 - **自繪而非現成元件**：月視圖、時間軸以 QPainter 自繪，不用 `QCalendarWidget` 或 `QTableView`+delegate。理由：格內色條 chip、「+N」、今天淡底需精細控制；命中測試是純幾何，可直接單元測試；時間軸的重疊並排分欄與現在時間線，標準元件無法表達。（`DatePopupButton` 彈出的小月曆仍是 `QCalendarWidget`，僅供挑日期。）
 - **純邏輯分離**：`calendar_logic.py` 不依賴 Qt widgets，涵蓋月格 42 格、週日期、`parse_event_dates`、`upcoming`、`timed_layout` 等，有完整單元測試。
 - **右側面板**：「即將到來」規則為明天以後依等級 30/7/3 天內、含進行中行程、排除已結束的定時行程、今天開始的只出現在選取日清單；另有選取日清單與等級圖例。

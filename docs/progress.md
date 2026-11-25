@@ -124,3 +124,12 @@
 - [x] `main.py` 於 Windows 建立 QApplication 前設定 AppUserModelID `Secretary.DesktopAssistant`，避免工作列顯示 Python 圖示／群組
 - 測試狀態：`python -m pytest -q`：443 passed。
 - 未實機驗證：工作列／標題列／系統匣實際顯示；既有桌面捷徑需重新執行 `scripts/create_shortcut.py` 才會換圖示，Windows 圖示快取可能需重新整理（`ie4uinit.exe -show`）。
+
+## 📌 MLB 每日內嵌頁面 (2026-11-25 完成)
+- [x] 新增 `ui/mlb_view.py`（`MlbView`、`MLB_DAILY_URL = https://haolun588.github.io/MLB-daily/index.html`）：`QWebEngineView` 內嵌 MLB-daily 網頁；頂部「MLB 每日」標題與「重新整理」按鈕；第一次顯示才建立 view 並載入（延遲載入）；`loadFinished(False)` 以 QLabel 提示「無法載入 MLB 頁面，請檢查網路後按重新整理」；`newWindowRequested` 交給 `QDesktopServices` 用系統瀏覽器開啟
+- [x] 新增 `assets/icons/baseball.svg` 導覽圖示
+- [x] `ui/nav_sidebar.py` 新增 `PAGE_MLB = 2`，`PAGE_SETTINGS` 由 2 改為 3；導覽順序 日曆、喝水、MLB、設定；`ui/main_window.py` 堆疊 0=日曆、1=喝水、2=MLB、3=設定
+- [x] `main.py` 與 `tests/conftest.py` 在建立 QApplication 前 `import PyQt6.QtWebEngineWidgets`（QtWebEngine 的要求）
+- [x] `requirements.txt` 新增 `PyQt6-WebEngine==6.11.0`
+- 測試狀態：語法檢查通過；`python -m pytest -q`：447 passed。使用者已在自己環境實際開啟並確認頁面正常顯示。
+- 已知注意事項：在 Claude Code 代理的受限執行環境中，初始化 WebEngine 會以 0xC0000409 崩潰（與專案程式無關，推測為環境限制），自動化環境無法實測網頁載入；網頁載入需在使用者本機驗證。
