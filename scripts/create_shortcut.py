@@ -2,6 +2,25 @@ import os
 import sys
 import subprocess
 
+def get_real_desktop():
+    """取得 PowerShell 回報的官方真實桌面路徑 (包含 OneDrive 桌面)；失敗時回傳空字串。"""
+    ps_cmd = (
+        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;"
+        "[System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop)"
+    )
+    try:
+        res = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps_cmd],
+            capture_output=True, encoding="utf-8", errors="replace",
+        )
+        path = (res.stdout or "").strip()
+        if path and os.path.exists(path):
+            return path
+    except Exception as e:
+        print("取得桌面路徑失敗:", e)
+    return ""
+
+
 def create_all_shortcuts():
     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     main_script = os.path.join(project_dir, "main.py")
@@ -11,10 +30,7 @@ def create_all_shortcuts():
     pythonw = os.path.join(python_dir, "pythonw.exe")
     target_exec = pythonw if os.path.exists(pythonw) else sys.executable
 
-    # 取得 PowerShell 返回的官方真實桌面路徑 (包含 OneDrive 桌面)
-    ps_cmd = "[System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop)"
-    res = subprocess.run(["powershell", "-Command", ps_cmd], capture_output=True, text=True)
-    real_desktop = res.stdout.strip()
+    real_desktop = get_real_desktop()
 
     candidate_desktops = [
         real_desktop,
@@ -43,9 +59,13 @@ def create_all_shortcuts():
         $Shortcut.Description = 'Secretary 智能桌面小助理'
         $Shortcut.Save()
         """
-        r = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_create], capture_output=True, text=True)
+        r = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_create],
+            capture_output=True, encoding="utf-8", errors="replace",
+        )
         if r.returncode == 0:
             created_paths.append(lnk_path)
+        else:
+            print(f"建立捷徑失敗 ({lnk_path}):", (r.stderr or "").strip())
 
     # 另外在專案根目錄下也建立一個「啟動 Secretary 小助理.bat」批次檔雙擊即可執行
     bat_path = os.path.join(project_dir, "啟動 Secretary 小助理.bat")
