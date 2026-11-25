@@ -133,3 +133,28 @@ def test_build_palette_roles(qapp):
     assert pal.color(QPalette.ColorRole.Window) == styles.qcolor(theme.BG)
     assert pal.color(QPalette.ColorRole.Highlight) == styles.qcolor(theme.ACCENT)
     assert pal.color(QPalette.ColorRole.PlaceholderText) == styles.qcolor(theme.TEXT_MUTED)
+
+
+def test_single_line_collapses_whitespace():
+    assert styles.single_line("a\nb\t c  ") == "a b c"
+    assert styles.single_line("  x\r\ny ") == "x y"
+
+
+def test_fit_text_strips_newlines(qapp):
+    from PyQt6.QtGui import QFontMetrics
+    fm = QFontMetrics(styles.make_font(theme.FONT_SM))
+    title = "Introduction to Digital\nCommunication"
+    assert "\n" not in styles.fit_text(fm, title, 1000)
+    assert styles.fit_text(fm, title, 1000) == "Introduction to Digital Communication"
+    assert "\n" not in styles.fit_text(fm, title, 60)
+    assert "\n" not in styles.fit_text(fm, title, 1)
+
+
+def test_elided_text_keeps_original_text_but_displays_single_line(qapp):
+    from ui.side_panel import _ElidedText
+    label = _ElidedText("Introduction to Digital\nCommunication")
+    assert label.text() == "Introduction to Digital\nCommunication"
+    assert label.toolTip() == "Introduction to Digital\nCommunication"
+    assert label._display == "Introduction to Digital Communication"
+    label.set_text("a\n b")
+    assert label._display == "a b"

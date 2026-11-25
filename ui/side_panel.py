@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QScrollArea, QSizePolic
 from ui import calendar_logic as cl
 from ui import theme
 from ui.components import LevelDot, level_color
-from ui.styles import make_font, qcolor
+from ui.styles import make_font, qcolor, single_line
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -31,6 +31,7 @@ class _ElidedText(QWidget):
         self._font = make_font(size, weight)
         self._color = color
         self._text = ""
+        self._display = ""
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setFixedHeight(QFontMetrics(self._font).height())
         self.set_text(text)
@@ -40,6 +41,7 @@ class _ElidedText(QWidget):
 
     def set_text(self, text):
         self._text = str(text)
+        self._display = single_line(self._text)   # 繪製與 sizeHint 用的單行文字，text()/tooltip 保留原文
         self.setToolTip(self._text)
         self.update()
 
@@ -47,13 +49,13 @@ class _ElidedText(QWidget):
         return QSize(0, self.height())
 
     def sizeHint(self):
-        return QSize(QFontMetrics(self._font).horizontalAdvance(self._text), self.height())
+        return QSize(QFontMetrics(self._font).horizontalAdvance(self._display), self.height())
 
     def paintEvent(self, e):
         p = QPainter(self)
         p.setFont(self._font)
         p.setPen(qcolor(self._color))
-        elided = QFontMetrics(self._font).elidedText(self._text, Qt.TextElideMode.ElideRight, self.width())
+        elided = QFontMetrics(self._font).elidedText(self._display,Qt.TextElideMode.ElideRight, self.width())
         p.drawText(QRect(0, 0, self.width(), self.height()),
                    Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, elided)
         p.end()

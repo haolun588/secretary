@@ -50,9 +50,16 @@ def make_font(size=theme.FONT_SM, weight=theme.WEIGHT_REGULAR):
     return font
 
 
+def single_line(text):
+    """把任何空白字元（換行、tab、連續空格）合併成單一空格並去頭尾空白，供單行繪製標題用。"""
+    return " ".join(str(text).split())
+
+
 def fit_text(metrics, text, width):
     """單行文字配合寬度：放得下原文或能顯示部分字 + 省略號就用 elide 結果；
-    窄到只剩省略號時改回傳原文，由呼叫端以 setClipRect 裁切，至少露出前 1–2 個字。"""
+    窄到只剩省略號時改回傳原文，由呼叫端以 setClipRect 裁切，至少露出前 1–2 個字。
+    輸入先經 single_line，含換行的標題不會畫成多行。"""
+    text = single_line(text)
     elided = metrics.elidedText(text, Qt.TextElideMode.ElideRight, max(0, width))
     if text and not elided.replace("…", ""):
         return text
