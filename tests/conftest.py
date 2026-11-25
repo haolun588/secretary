@@ -7,6 +7,8 @@ import tempfile
 
 import pytest
 
+import PyQt6.QtWebEngineWidgets  # noqa: F401  須在建立 QApplication 前匯入（與 main.py 相同）
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)

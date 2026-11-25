@@ -1,6 +1,6 @@
 """
 ui/nav_sidebar.py
-左側窄版圖示導覽列（寬 theme.NAV_WIDTH）：Logo、日曆、喝水、設定，底部為喝水倒數。
+左側窄版圖示導覽列（寬 theme.NAV_WIDTH）：Logo、日曆、喝水、MLB、設定，底部為喝水倒數。
 樣式一律來自 ui/styles.py 的 _NAV 區段（QFrame#NavSidebar、QToolButton:checked、NavCountdown）。
 """
 
@@ -17,7 +17,8 @@ logger = get_logger(__name__)
 
 PAGE_CALENDAR = 0
 PAGE_WATER = 1
-PAGE_SETTINGS = 2
+PAGE_MLB = 2
+PAGE_SETTINGS = 3
 
 _COUNTDOWN_OFF_TEXT = "關"
 _COUNTDOWN_OFF_TIP = "喝水提醒已關閉"
@@ -91,14 +92,16 @@ class NavSidebar(QFrame):
 
         self.btn_calendar = self._make_nav_button("calendar", "日曆與行程")
         self.btn_water = self._make_nav_button("droplet", "喝水提醒")
+        self.btn_mlb = self._make_nav_button("baseball", "MLB 每日")
         self.btn_settings = self._make_nav_button("settings", "設定")
         self.btn_calendar.setChecked(True)
 
         self.btn_calendar.clicked.connect(lambda: self.set_active_page(PAGE_CALENDAR))
         self.btn_water.clicked.connect(lambda: self.set_active_page(PAGE_WATER))
+        self.btn_mlb.clicked.connect(lambda: self.set_active_page(PAGE_MLB))
         self.btn_settings.clicked.connect(lambda: self.set_active_page(PAGE_SETTINGS))
 
-        for btn in (self.btn_calendar, self.btn_water, self.btn_settings):
+        for btn in (self.btn_calendar, self.btn_water, self.btn_mlb, self.btn_settings):
             layout.addWidget(btn, 0, align)
 
         layout.addStretch(1)
@@ -114,11 +117,13 @@ class NavSidebar(QFrame):
         layout.addWidget(self.countdown_label)
 
     def set_active_page(self, page_index):
-        """切換頁面：更新按鈕選取態並發出 page_changed；只接受 PAGE_CALENDAR / PAGE_WATER / PAGE_SETTINGS。"""
+        """切換頁面：更新按鈕選取態並發出 page_changed；只接受 PAGE_CALENDAR / PAGE_WATER / PAGE_MLB / PAGE_SETTINGS。"""
         if page_index == PAGE_CALENDAR:
             btn = self.btn_calendar
         elif page_index == PAGE_WATER:
             btn = self.btn_water
+        elif page_index == PAGE_MLB:
+            btn = self.btn_mlb
         elif page_index == PAGE_SETTINGS:
             btn = self.btn_settings
         else:

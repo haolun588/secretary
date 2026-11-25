@@ -405,7 +405,7 @@ QDialog QComboBox[invalid="true"]:focus { border: 1px solid {DANGER}; }
 """
 
 _SETTINGS = """
-QWidget#SettingsPage, QWidget#WaterPage { background: {BG}; }
+QWidget#SettingsPage, QWidget#WaterPage, QWidget#MlbPage { background: {BG}; }
 QFrame#SettingsGroup {
     background: {SURFACE_1};
     border: 1px solid {BORDER};

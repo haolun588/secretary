@@ -1,6 +1,6 @@
 """
 ui/main_window.py
-主視窗外框容器：左側窄版導覽列 + 右側頁面堆疊（0=日曆、1=喝水、2=設定）。
+主視窗外框容器：左側窄版導覽列 + 右側頁面堆疊（0=日曆、1=喝水、2=MLB、3=設定）。
 樣式由全域 QSS（ui/styles.py）負責；此檔只處理版面與頁面切換。
 """
 
@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QWidget
 
 from ui import theme
 from ui.calendar_view import CalendarView
+from ui.mlb_view import MlbView
 from ui.nav_sidebar import NavSidebar
 from ui.settings_view import SettingsView
 from ui.water_view import WaterView
@@ -57,11 +58,13 @@ class MainWindow(QMainWindow):
 
         self.calendar_view = CalendarView(self.event_store, self)
         self.water_view = WaterView(self)
+        self.mlb_view = MlbView(self)
         self.settings_view = SettingsView(self.event_store, self)
 
         self.stacked_widget.addWidget(self.calendar_view)  # Index 0: 日曆
         self.stacked_widget.addWidget(self.water_view)  # Index 1: 喝水
-        self.stacked_widget.addWidget(self.settings_view)  # Index 2: 設定
+        self.stacked_widget.addWidget(self.mlb_view)  # Index 2: MLB
+        self.stacked_widget.addWidget(self.settings_view)  # Index 3: 設定
 
         main_layout.addWidget(self.stacked_widget, stretch=1)
 

@@ -7,7 +7,7 @@ pytest.importorskip("PyQt6.QtWidgets")
 
 from ui import theme  # noqa: E402
 from ui.nav_sidebar import (  # noqa: E402
-    PAGE_CALENDAR, PAGE_SETTINGS, PAGE_WATER, NavSidebar, format_countdown,
+    PAGE_CALENDAR, PAGE_MLB, PAGE_SETTINGS, PAGE_WATER, NavSidebar, format_countdown,
 )
 
 
@@ -103,7 +103,7 @@ def test_set_active_page(sidebar):
 
 
 def test_page_constants_follow_button_order():
-    assert (PAGE_CALENDAR, PAGE_WATER, PAGE_SETTINGS) == (0, 1, 2)
+    assert (PAGE_CALENDAR, PAGE_WATER, PAGE_MLB, PAGE_SETTINGS) == (0, 1, 2, 3)
     assert not hasattr(NavSidebar, "water_requested")
 
 
@@ -179,7 +179,7 @@ def test_main_window_sizes_use_tokens(window):
 
 
 def test_main_window_public_attributes(window):
-    assert window.stacked_widget.count() == 3
+    assert window.stacked_widget.count() == 4
     assert window.stacked_widget.widget(PAGE_CALENDAR) is window.calendar_view
     assert window.stacked_widget.widget(PAGE_WATER) is window.water_view
     assert window.stacked_widget.widget(PAGE_SETTINGS) is window.settings_view

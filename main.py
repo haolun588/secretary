@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMessageBox
 from PyQt6.QtGui import QIcon
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
+import PyQt6.QtWebEngineWidgets  # noqa: F401  需在建立 QApplication 前匯入
 
 from utils.logger import get_logger
 from utils.paths import asset_path, ensure_data_dirs, migrate_legacy_files
