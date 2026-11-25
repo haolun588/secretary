@@ -100,3 +100,55 @@ def test_winid_exception_returns_false(monkeypatch):
 
     assert win_titlebar.enable_dark_titlebar(_Bad()) is False
     assert reached == [True]
+
+
+class _RecordingDwm(_FakeDwm):
+    """額外記錄傳入的值（ref 指向的 c_int）。"""
+
+    def __init__(self, results):
+        super().__init__(results)
+        self.values = []
+
+    def __call__(self, hwnd, attribute, ref, size):
+        self.values.append(ref._obj.value)
+        return super().__call__(hwnd, attribute, ref, size)
+
+
+def test_set_cloak_non_windows_returns_false(monkeypatch):
+    monkeypatch.setattr(sys, "platform", "linux")
+    assert win_titlebar.set_cloak(_Widget(), True) is False
+
+
+def test_set_cloak_offscreen_returns_false(monkeypatch):
+    qtgui = pytest.importorskip("PyQt6.QtGui")
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(qtgui.QGuiApplication, "platformName", staticmethod(lambda: "offscreen"))
+    assert win_titlebar.set_cloak(_Widget(), True) is False
+
+
+@pytest.mark.parametrize("cloaked,expected", [(True, 1), (False, 0)])
+def test_set_cloak_uses_attribute_13_and_value(monkeypatch, cloaked, expected):
+    fake = _RecordingDwm([0])
+    _install_fake_dwm(monkeypatch, fake)
+    widget = _Widget()
+    assert win_titlebar.set_cloak(widget, cloaked) is True
+    assert widget.window_called
+    assert fake.attributes == [13]
+    assert fake.values == [expected]
+    assert fake.restype is ctypes.c_long and len(fake.argtypes) == 4
+
+
+def test_set_cloak_nonzero_hresult_returns_false(monkeypatch):
+    fake = _RecordingDwm([-1])
+    _install_fake_dwm(monkeypatch, fake)
+    assert win_titlebar.set_cloak(_Widget(), True) is False
+    assert fake.attributes == [13]
+
+
+def test_set_cloak_exception_returns_false(monkeypatch):
+    class _BoomDwm(_FakeDwm):
+        def __call__(self, hwnd, attribute, ref, size):
+            raise OSError("dwm failed")
+
+    _install_fake_dwm(monkeypatch, _BoomDwm([]))
+    assert win_titlebar.set_cloak(_Widget(), True) is False

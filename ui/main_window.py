@@ -6,6 +6,7 @@ ui/main_window.py
 
 import os
 
+from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QWidget
 
@@ -17,9 +18,12 @@ from ui.settings_view import SettingsView
 from ui.water_view import WaterView
 from utils.logger import get_logger
 from utils.paths import asset_path
-from utils.win_titlebar import enable_dark_titlebar
+from utils.win_titlebar import enable_dark_titlebar, set_cloak
 
 logger = get_logger(__name__)
+
+# 視窗顯示後延遲取消 cloak 的毫秒數：等 RHI 第一張畫面畫好再露出，避免白閃
+_UNCLOAK_DELAY_MS = 30
 
 
 class MainWindow(QMainWindow):
@@ -73,6 +77,9 @@ class MainWindow(QMainWindow):
 
     def showEvent(self, event):
         super().showEvent(event)
+        # Qt 先送 QShowEvent 才真正顯示 native 視窗，此處 cloak 可蓋住 RHI 首張畫面前的白底
+        if not event.spontaneous() and set_cloak(self, True):
+            QTimer.singleShot(_UNCLOAK_DELAY_MS, lambda: set_cloak(self, False))
         if not self._titlebar_done:
             self._titlebar_done = True
             enable_dark_titlebar(self)
