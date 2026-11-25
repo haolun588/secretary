@@ -6,7 +6,7 @@ MLB 頁：以 QWebEngineView 內嵌顯示 MLB 每日頁面。
 """
 
 from PyQt6.QtCore import Qt, QUrl
-from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtGui import QColor, QDesktopServices
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QStackedLayout, QVBoxLayout, QWidget
 
@@ -63,6 +63,8 @@ class MlbView(QWidget):
         self.web_view.page().newWindowRequested.connect(
             lambda request: QDesktopServices.openUrl(request.requestedUrl())
         )
+        # 網頁載入前預設白底，改為主題底色避免在深色主題下刺眼
+        self.web_view.page().setBackgroundColor(QColor(theme.BG))
         self._body.addWidget(self.web_view)
         self._body.setCurrentWidget(self.web_view)
         self.web_view.setUrl(QUrl(MLB_DAILY_URL))
