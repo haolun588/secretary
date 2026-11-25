@@ -145,3 +145,9 @@
 - [x] 修正行程標題含換行（例如 `Introduction to Digital\nCommunication`）時，月曆 chip、週／日行程區塊與右側面板只預留一行高度、`elidedText` 不處理 `\n` 導致文字上下被切的問題
 - [x] `ui/styles.py` 新增 `single_line(text)`（空白字元合併為單一空格並去頭尾）；`fit_text` 先單行化再 elide；`ui/side_panel.py` 的 `_ElidedText` 繪製與 `sizeHint` 改用單行化文字，`text()` 與 tooltip 保留原文
 - 測試狀態：語法檢查通過、`python -m pytest -q`：450 passed。未實機驗證畫面。
+
+## 📌 捷徑腳本編碼修正 (2026-11-25 完成)
+- [x] 修正 `scripts/create_shortcut.py` 在繁中 Windows 上因 PowerShell 輸出以 cp950 解碼而 `UnicodeDecodeError`、接著 `AttributeError: 'NoneType' object has no attribute 'strip'` 當掉的問題
+- [x] 新增 `get_real_desktop()`：PowerShell 輸出改用 UTF-8（`[Console]::OutputEncoding`，subprocess `encoding="utf-8", errors="replace"`）；讀不到桌面路徑時回傳空字串並改用後備路徑，不再中斷；建立捷徑失敗時印出 stderr
+- 測試狀態：`python -m pytest -q`：450 passed；`get_real_desktop()` 已驗證可取得存在的桌面路徑。
+- 已知問題：更換 `icon.ico` 後 Windows 圖示快取不會自動更新桌面捷徑，詳見 `docs/dev_logs/20261125_捷徑腳本編碼修正.md`。
