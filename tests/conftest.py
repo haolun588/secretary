@@ -35,5 +35,6 @@ def _session_qapplication():
     except Exception:
         yield None
         return
-    app = QApplication.instance() or QApplication([])
+    # QtWebEngine（Chromium）需要非空 argv，空 argv 呼叫 QWebEngineView.page() 會原生崩潰
+    app = QApplication.instance() or QApplication(sys.argv[:1] or ["pytest"])
     yield app
