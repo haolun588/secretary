@@ -7,6 +7,11 @@ Secretary 智能桌面小助理 - 主程式入口 (Application Entry Point)
 
 import sys
 import os
+
+# 讓所有 widget 視窗一開始就用 RHI 合成；否則第一次顯示 QWebEngineView（MLB 頁）時
+# Qt 會重建主視窗而閃爍。必須在建立 QApplication 前設定；用 setdefault 讓使用者仍可用環境變數覆寫。
+os.environ.setdefault("QT_WIDGETS_RHI", "1")
+
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMessageBox
 from PyQt6.QtGui import QIcon
