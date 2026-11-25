@@ -42,11 +42,11 @@ TEXT_SECONDARY = "#a3b0cc"
 TEXT_MUTED = "#6b7894"
 
 # 主色
-ACCENT = "#2dd4bf"
-ACCENT_HOVER = "#22b8a6"
-ACCENT_MUTED = "rgba(45,212,191,0.16)"
-ACCENT_SOFT = "rgba(45,212,191,0.08)"
-TEXT_ON_ACCENT = "#04201c"  # 青綠底配深字
+ACCENT = "#85b7eb"
+ACCENT_HOVER = "#6aa3e0"
+ACCENT_MUTED = "rgba(133,183,235,0.16)"
+ACCENT_SOFT = "rgba(133,183,235,0.08)"
+TEXT_ON_ACCENT = "#042c53"  # 天空藍底配深藍字
 
 # 互動狀態疊色
 HOVER = "rgba(255,255,255,0.04)"
@@ -62,12 +62,12 @@ SUCCESS = "#3fb950"
 WARNING = "#fbbf24"
 
 # 行程等級色（與語意色脫鉤）：色條 / 色點用 PRIORITY，整格底色與文字用 BG / TEXT
-PRIORITY = {"major": "#fb7185", "medium": "#fbbf24", "minor": "#60a5fa"}
+PRIORITY = {"major": "#fb7185", "medium": "#fbbf24", "minor": "#2dd4bf"}
 PRIORITY_BG = {"major": "rgba(251,113,133,0.18)", "medium": "rgba(251,191,36,0.16)",
-               "minor": "rgba(96,165,250,0.18)"}
+               "minor": "rgba(45,212,191,0.18)"}
 PRIORITY_BG_HOVER = {"major": "rgba(251,113,133,0.30)", "medium": "rgba(251,191,36,0.28)",
-                     "minor": "rgba(96,165,250,0.30)"}
-PRIORITY_TEXT = {"major": "#ffd1d8", "medium": "#ffe7a3", "minor": "#d4e6ff"}
+                     "minor": "rgba(45,212,191,0.30)"}
+PRIORITY_TEXT = {"major": "#ffd1d8", "medium": "#ffe7a3", "minor": "#ccfbf1"}
 
 # 字型
 FONT_FAMILY = "'Segoe UI', 'Microsoft JhengHei UI', sans-serif"
