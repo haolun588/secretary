@@ -8,7 +8,7 @@ secretary/
 ├── requirements-dev.txt          # 開發依賴（pytest，固定版本）
 ├── .gitignore
 ├── assets/                       # 圖示資源
-│   ├── logo.svg                  # 品牌 logo 原稿（青綠漸層圓角方塊＋日曆＋時鐘，原色渲染，不重新上色）；側邊欄、get_app_icon 後備、icon.png / icon.ico 皆由它而來
+│   ├── logo.svg                  # 品牌 logo 原稿（深藍 #042C53 圓角方底＋白色 S 字，S 上半圈為錶面，中間天空藍 #85B7EB 指針與軸心，原色渲染，不重新上色）；側邊欄、get_app_icon 後備、icon.png / icon.ico 皆由它而來
 │   ├── icon.ico / icon.png       # 應用程式圖示（由 icon_generator 自 logo.svg 產生；ico 內含 16/24/32/48/64/128/256 七種尺寸）
 │   └── icons/*.svg               # UI 線條圖示（專案自繪，24 格、stroke currentColor；風格參考 Lucide（ISC 授權），非複製 Lucide 原始檔）；含 baseball.svg（MLB 導覽圖示）
 ├── docs/

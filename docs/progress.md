@@ -2,7 +2,7 @@
 
 ## 📌 Phase 1: 基礎架構與桌面 UI 介面 (已完成；UI 已由階段 C 取代)
 - [x] PyQt6 專案目錄結構與主程式建立 (`main.py`, `ui/`)
-- [x] 暗黑高顏值主題與電光紫配色 (`#121217`, `#1c1c24`, `#8b5cf6`)（已由階段 C 的 `ui/theme.py` token 取代；現行為深藍底＋青綠主色，見「配色改版」）
+- [x] 暗黑高顏值主題與電光紫配色 (`#121217`, `#1c1c24`, `#8b5cf6`)（已由階段 C 的 `ui/theme.py` token 取代；現行為深藍底＋天空藍主色，見「配色改版」與「藍色 logo 與主色改版」）
 - [x] 左側導覽列 `NavSidebar` (日曆與行程 / 喝水與設定)（階段 C 改為 52px 圖示導覽列）
 - [x] 中間月曆 `CalendarView` (440px 寬、1:1 置中、週末電光紫字體)（階段 C 改為自繪月／週／日視圖，已無 QCalendarWidget）
 - [x] 右側提醒面板 `SidebarFrame` (340px 緊貼右側、雙行頂部導覽列)（階段 C 改為 300px `SidePanel`）
@@ -27,7 +27,7 @@
 - [x] 編輯行程右下角三鈕區 (`[取消]` `[🗑️ 刪除行程]` `[儲存行程]`)
 - [x] 專屬暗黑紫紅刪除確認對話框 (`ConfirmDeleteDialog`)
 - [x] Google 日曆讀取、新增 (`insert_event`)、更新 (`patch_event`) 與刪除 (`delete_event`) 功能（`services/google_client.py`，經 `EventStore` 呼叫；同步缺陷已於階段 B 修正）
-- [x] 桌面 256x256 高畫質電光圖示 `icon.png` / `icon.ico`（配色改版後改為青綠底）
+- [x] 桌面 256x256 高畫質電光圖示 `icon.png` / `icon.ico`（現為深藍底 S 字時鐘 logo，見「藍色 logo 與主色改版」）
 - [x] Windows 桌面捷徑 `Secretary 智能桌面小助理.lnk` 自動建立
 
 ## ⚠️ 已知問題（2026-11-24 審查）
@@ -124,6 +124,13 @@
 - [x] `main.py` 於 Windows 建立 QApplication 前設定 AppUserModelID `Secretary.DesktopAssistant`，避免工作列顯示 Python 圖示／群組
 - 測試狀態：`python -m pytest -q`：443 passed。
 - 未實機驗證：工作列／標題列／系統匣實際顯示；既有桌面捷徑需重新執行 `scripts/create_shortcut.py` 才會換圖示，Windows 圖示快取可能需重新整理（`ie4uinit.exe -show`）。
+
+## 📌 藍色 logo 與主色改版 (2026-11-25 完成；未實機驗證)
+- [x] `assets/logo.svg` 換成新 logo：深藍圓角方底 `#042C53`、白色 S 字，S 上半圈當錶面，中間天空藍 `#85B7EB` 指針與軸心；`assets/icon.png`、`icon.ico` 由 `scripts/icon_generator.py` 重新產生（app 圖示、側邊欄 logo、捷徑圖示隨之改變）
+- [x] `ui/theme.py` 主色由青綠改為天空藍：ACCENT `#85b7eb`、ACCENT_HOVER `#6aa3e0`、ACCENT_MUTED／SOFT 改為 `rgba(133,183,235,…)`、TEXT_ON_ACCENT `#042c53`
+- [x] 行程等級 minor 由藍 `#60a5fa` 改為青綠 `#2dd4bf`（BG／HOVER 為 `rgba(45,212,191,…)`，TEXT `#ccfbf1`），避免與新主色撞色
+- 測試狀態：`python -m pytest -q`：450 passed。
+- 未實機驗證：實際畫面與圖示；既有桌面捷徑需重新執行 `scripts/create_shortcut.py` 才會換圖示。
 
 ## 📌 MLB 每日內嵌頁面 (2026-11-25 完成)
 - [x] 新增 `ui/mlb_view.py`（`MlbView`、`MLB_DAILY_URL = https://haolun588.github.io/MLB-daily/index.html`）：`QWebEngineView` 內嵌 MLB-daily 網頁；頂部「MLB 每日」標題與「重新整理」按鈕；第一次顯示才建立 view 並載入（延遲載入）；`loadFinished(False)` 以 QLabel 提示「無法載入 MLB 頁面，請檢查網路後按重新整理」；`newWindowRequested` 交給 `QDesktopServices` 用系統瀏覽器開啟

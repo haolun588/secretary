@@ -43,7 +43,7 @@
 - **樣式集中於 `ui/styles.py`**：全域 QSS 依元件分段，由 `apply_app_style(app)` 套用（同時設定 palette 與字型；全域 palette 已設 Window=BG）。元件以 objectName、動態屬性 `variant`（`primary`/`secondary`/`ghost`/`danger`，另有 `danger` 的 soft 變體）與 `role` 選擇；切換屬性後呼叫 `repolish(widget)`。不在各 UI 檔以 `setStyleSheet` 寫大段 QSS，少量動態樣式用 `qss()` + token（只替換 `{全大寫TOKEN}`，未知 token 會 raise `KeyError`；`px` 單位自行撰寫）。
 - **QPainter**：顏色用 `qcolor(theme.X)`（支援 `#rrggbb` 與 `rgba()`），字型用 `make_font()`，截斷文字用 `fit_text()`。
 - **圖示**：用 `ui.icons.icon()` / `pixmap()`。新增圖示需手寫 24 格線條 SVG（viewBox 0 0 24 24、fill none、stroke currentColor、stroke-width 2、round cap/join）放 `assets/icons/`，不下載、不複製他人檔案。
-- **色彩使用**：主色 `ACCENT`（青綠）只用於選取狀態與主要按鈕，且每頁至多一顆 primary，danger 按鈕文字用 `TEXT_ON_DANGER`。行程等級色（大玫瑰／中琥珀／小藍）與語意色 DANGER/SUCCESS/WARNING 脫鉤，取自 `theme.PRIORITY*`；月視圖 chip、週／日行程區塊、全天 chip 整格依等級上色（`level_bg()` 底、`level_text()` 字，保留左側 `LEVEL_BAR` 色條），LevelDot 等小元件仍只用 `level_color()`。新增等級相關顏色須通過 `tests/test_theme.py` 的 WCAG 對比度測試。
+- **色彩使用**：主色 `ACCENT`（天空藍 `#85b7eb`）只用於選取狀態與主要按鈕，且每頁至多一顆 primary，danger 按鈕文字用 `TEXT_ON_DANGER`。行程等級色（大玫瑰／中琥珀／小青綠）與語意色 DANGER/SUCCESS/WARNING 脫鉤，取自 `theme.PRIORITY*`；月視圖 chip、週／日行程區塊、全天 chip 整格依等級上色（`level_bg()` 底、`level_text()` 字，保留左側 `LEVEL_BAR` 色條），LevelDot 等小元件仍只用 `level_color()`。新增等級相關顏色須通過 `tests/test_theme.py` 的 WCAG 對比度測試。
 - **頂層 QWidget**（對話框、toast、彈出視窗）需自設底色或設 `WA_TranslucentBackground`。
 
 ### 2.3 測試規範
