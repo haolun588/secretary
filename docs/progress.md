@@ -125,6 +125,15 @@
 - 測試狀態：`python -m pytest -q`：443 passed。
 - 未實機驗證：工作列／標題列／系統匣實際顯示；既有桌面捷徑需重新執行 `scripts/create_shortcut.py` 才會換圖示，Windows 圖示快取可能需重新整理（`ie4uinit.exe -show`）。
 
+## 📌 MLB 頁第一次開啟視窗閃爍修正 (2026-11-25 完成；app 實機尚待使用者確認)
+- [x] `main.py`：匯入 PyQt6 前 `os.environ.setdefault("QT_WIDGETS_RHI", "1")`，讓所有 widget 視窗一開始就用 RHI 合成。原因：第一次顯示 QWebEngineView（RHI 元件）時，Qt 會銷毀並重建 top-level 視窗（native surface 重建、winId 改變），造成第一次點 MLB 頁時整個 app 消失一瞬；使用者仍可用環境變數覆寫
+- [x] 第一次嘗試「提早建立 QWebEngineView」已證實無效（啟動時建立一樣會重建視窗）且拖慢啟動，`ui/mlb_view.py`、`docs/architecture.md` 已還原
+- [x] `tests/conftest.py`：session `QApplication` 改用非空 argv（`sys.argv[:1] or ["pytest"]`）；QtWebEngine 在空 argv 下呼叫 `page()` 會原生崩潰，正式 app 不受影響
+- 診斷：以腳本監看 top-level 的 PlatformSurface／WinIdChange 事件，未設定時切頁出現 SurfaceAboutToBeDestroyed→SurfaceCreated 且 winId 改變；設 `QT_WIDGETS_RHI=1` 後無重建
+- 未實機驗證：app 實機尚待使用者確認；需留意 toast 半透明視窗等其他視窗外觀是否正常
+- [x] `ui/mlb_view.py`：建立 `QWebEngineView` 後以 `page().setBackgroundColor(QColor(theme.BG))` 將網頁載入前的預設白底改為主題底色；尚未實機驗證
+- [x] 啟動白閃：RHI 首張畫面前 DWM 顯示白底（約 20~30ms）；`utils/win_titlebar.py` 新增 `set_cloak`（DWMWA_CLOAK=13），`MainWindow.showEvent` 先 cloak、30ms 後取消；診斷腳本 4 次皆無白色，app 實機尚待使用者確認
+
 ## 📌 藍色 logo 與主色改版 (2026-11-25 完成；未實機驗證)
 - [x] `assets/logo.svg` 換成新 logo：深藍圓角方底 `#042C53`、白色 S 字，S 上半圈當錶面，中間天空藍 `#85B7EB` 指針與軸心；`assets/icon.png`、`icon.ico` 由 `scripts/icon_generator.py` 重新產生（app 圖示、側邊欄 logo、捷徑圖示隨之改變）
 - [x] `ui/theme.py` 主色由青綠改為天空藍：ACCENT `#85b7eb`、ACCENT_HOVER `#6aa3e0`、ACCENT_MUTED／SOFT 改為 `rgba(133,183,235,…)`、TEXT_ON_ACCENT `#042c53`

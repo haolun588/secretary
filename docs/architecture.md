@@ -57,7 +57,7 @@ secretary/
     ├── logger.py                 # 日誌設定 (get_logger，RotatingFileHandler 寫入 data/logs/)
     ├── paths.py                  # 集中路徑定義
     ├── water_timer.py            # WaterCountdown：喝水倒數純邏輯（tick／snooze／reset，無 Qt）
-    └── win_titlebar.py           # enable_dark_titlebar：DWM 深色標題列，失敗回傳 False 不 raise
+    └── win_titlebar.py           # enable_dark_titlebar：DWM 深色標題列；set_cloak：DWMWA_CLOAK 暫時隱藏視窗（避免 RHI 啟動白閃）；失敗回傳 False 不 raise
 ```
 
 ## 2. 資料流與組件交互說明
@@ -76,7 +76,7 @@ secretary/
 
 ### 2.2 日曆頁結構與設計取捨
 - **導覽**：`NavSidebar` 為 52px 圖示列。頁面順序為 日曆(0)／喝水(1)／MLB(2)／設定(3)，與側欄按鈕順序一致（`PAGE_CALENDAR`／`PAGE_WATER`／`PAGE_MLB`／`PAGE_SETTINGS`），四顆按鈕都走 `set_active_page`。喝水為獨立頁面（`WaterView`）：頂部大字倒數，下方沿用設定頁的卡片列放開關、間隔、測試；`main.py` 每秒同時餵導覽列與喝水頁。
-- **MLB 內嵌頁**：`MlbView` 以 `QWebEngineView` 內嵌 `https://haolun588.github.io/MLB-daily/index.html`（常數 `MLB_DAILY_URL`）。第一次顯示該頁才建立 view 並載入（延遲載入，不拖慢啟動）；`loadFinished(False)` 時顯示「無法載入 MLB 頁面，請檢查網路後按重新整理」；網頁開新視窗（`newWindowRequested`）改由 `QDesktopServices` 用系統瀏覽器開啟。QtWebEngine 要求在建立 `QApplication` 前先 `import PyQt6.QtWebEngineWidgets`，故 `main.py` 與 `tests/conftest.py` 都有此 import。
+- **MLB 內嵌頁**：`MlbView` 以 `QWebEngineView` 內嵌 `https://haolun588.github.io/MLB-daily/index.html`（常數 `MLB_DAILY_URL`）。第一次顯示該頁才建立 view 並載入（延遲載入，不拖慢啟動）；`loadFinished(False)` 時顯示「無法載入 MLB 頁面，請檢查網路後按重新整理」；網頁開新視窗（`newWindowRequested`）改由 `QDesktopServices` 用系統瀏覽器開啟。QtWebEngine 要求在建立 `QApplication` 前先 `import PyQt6.QtWebEngineWidgets`，故 `main.py` 與 `tests/conftest.py` 都有此 import。`main.py` 另在匯入 PyQt6 前設定 `QT_WIDGETS_RHI=1`（可由環境變數覆寫），避免第一次顯示 MLB 頁時 Qt 重建主視窗而閃爍。
 - **自繪而非現成元件**：月視圖、時間軸以 QPainter 自繪，不用 `QCalendarWidget` 或 `QTableView`+delegate。理由：格內色條 chip、「+N」、今天淡底需精細控制；命中測試是純幾何，可直接單元測試；時間軸的重疊並排分欄與現在時間線，標準元件無法表達。（`DatePopupButton` 彈出的小月曆仍是 `QCalendarWidget`，僅供挑日期。）
 - **純邏輯分離**：`calendar_logic.py` 不依賴 Qt widgets，涵蓋月格 42 格、週日期、`parse_event_dates`、`upcoming`、`timed_layout` 等，有完整單元測試。
 - **右側面板**：「即將到來」規則為明天以後依等級 30/7/3 天內、含進行中行程、排除已結束的定時行程、今天開始的只出現在選取日清單；另有選取日清單與等級圖例。
