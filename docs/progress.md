@@ -133,3 +133,8 @@
 - [x] `requirements.txt` 新增 `PyQt6-WebEngine==6.11.0`
 - 測試狀態：語法檢查通過；`python -m pytest -q`：447 passed。使用者已在自己環境實際開啟並確認頁面正常顯示。
 - 已知注意事項：在 Claude Code 代理的受限執行環境中，初始化 WebEngine 會以 0xC0000409 崩潰（與專案程式無關，推測為環境限制），自動化環境無法實測網頁載入；網頁載入需在使用者本機驗證。
+
+## 📌 標題換行單行化 (2026-11-25 完成)
+- [x] 修正行程標題含換行（例如 `Introduction to Digital\nCommunication`）時，月曆 chip、週／日行程區塊與右側面板只預留一行高度、`elidedText` 不處理 `\n` 導致文字上下被切的問題
+- [x] `ui/styles.py` 新增 `single_line(text)`（空白字元合併為單一空格並去頭尾）；`fit_text` 先單行化再 elide；`ui/side_panel.py` 的 `_ElidedText` 繪製與 `sizeHint` 改用單行化文字，`text()` 與 tooltip 保留原文
+- 測試狀態：語法檢查通過、`python -m pytest -q`：450 passed。未實機驗證畫面。
